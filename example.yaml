@@ -7,7 +7,7 @@ tasks:
   env:
     foo: bar
 
-- name: test-2
+- me: test-2
   command: bb ./test/print-rand.clj
   deps:
     - test-1
