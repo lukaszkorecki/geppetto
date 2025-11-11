@@ -1,16 +1,13 @@
 #!/usr/bin/env bb
 
-(def counter (atom 0))
-
-(def die-after (rand-int 100))
-
-(printf "Starting GP_ID=%s will die after %d iterations\n" (System/getenv "GP_ID") die-after)
 
 (while true
   (printf "%s - %s - %s\n" (System/getenv "GP_ID") (System/getenv "foo") (rand-int 100))
-  (swap! counter inc)
+  (flush)
 
-  (when (>= @counter die-after)
-    (System/exit 1))
+  (when (rand-nth [true false false false false false false false false false])
+    (binding [*out* *err*]
+      (println "This is an error message!\nLeverage agile frameworks to provide a robust synopsis for high level overviews. Iterative approaches to corporate strategy foster collaborative thinking to further the overall value proposition. Organically grow the holistic world view of disruptive innovation via workplace diversity and empowerment.")
+      (flush)))
 
-  (Thread/sleep (rand-int 1000)))
+  (Thread/sleep 100))

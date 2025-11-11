@@ -1,6 +1,7 @@
 
+tasks:
 - name: test-1
-  command: bb ./test/print-rand.clj
+  command: sh -c "sleep 5 && bb ./test/print-rand.clj"
   tags:
     - one
   env:

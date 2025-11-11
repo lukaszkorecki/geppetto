@@ -3,12 +3,14 @@
   (:require [babashka.process :as proc]
             [babashka.fs :as fs]
             [clojure.java.io :as io]
-            [clojure.tools.logging :as log]
             [com.stuartsierra.component :as component]
             [clj-yaml.core :as yaml]
             [malli.core :as m]
-            [malli.error :as me]))
+            [malli.error :as me]
+            [clojure.walk :as walk]
+            flatland.ordered.map))
 
+;; Schema & config processing
 (def Task
   [:map
    [:command {:min 1} :string]
@@ -19,48 +21,80 @@
     ;; FIXME: we need to also account for numbers
     [:map-of :keyword :string]]])
 
-(def Tasks
-  [:every #'Task])
+(def TaskConfig
+  [:map
+   [:settings {:optional true}
+  ;; TODO
+    [:map-of :string :string]]
+
+   [:tasks
+    [:every #'Task]]])
 
 (defn verify-config [conf]
-  (when-not (m/validate Tasks conf)
-    (-> (m/explain Tasks conf)
+  (when-not (m/validate TaskConfig conf)
+    (println "ERROR: invalid config:")
+    (-> (m/explain TaskConfig conf)
         me/humanize
-        prn)))
+        (yaml/generate-string)
+        println)
+    (System/exit 13)))
+
+(def cl
+  (class (yaml/parse-string "foo: bar")))
 
 (defn load-config [conf-path]
-
-  (let [abs-path (str (fs/expand-home conf-path))
-        content (slurp abs-path)
-        conf (yaml/parse-string content)]
+  (let [content (slurp conf-path)
+        conf (->> (yaml/parse-string content)
+                  (walk/postwalk (fn [thing]
+                                   (if (instance? cl thing)
+                                     (into {} thing)
+                                     thing))))]
     (verify-config conf)
     conf))
 
-#_(comment
+;; Task output logging
+(def color-codes
+  {0 31 ; red
+   1 32 ; green
+   2 33 ; yellow
+   3 34 ; blue
+   4 35 ; magenta
+   5 36 ; cyan
+   })
 
-    (defn output-wrapper [proc prefix stream-key]
-      (let [stream (stream-key proc)
-            rdr (io/reader stream)]
-        (doseq [line (line-seq rdr)]
-          (println prefix line))))
+(defn task-name->color-str
+  "Calculate hash and return ANSI color code string for task name"
+  [name]
+  (let [hash-code (mod (reduce + (map int name)) 6)
+        color-code (get color-codes hash-code 37)]
+    (str "\u001b[" color-code "m" name "\u001b[0m")))
 
-    (let [proc1 (process/process "ls")
-          proc2 (process/process "ls" "-la")]
-      (future (output-wrapper proc1 "[A]" :out))
-      (future (output-wrapper proc2 "[B]" :out))
-      (future (output-wrapper proc1 "[A:ERR]" :err))
-      (future (output-wrapper proc2 "[B:ERR]" :err))
-      @proc1
-      @proc2))
+(defn log
+  "Like print, but threadsafe"
+  [s]
+  (locking *out*
+    (println s)
+    (flush)))
+
+;; Process management
+
+(defn wait-for-process
+  "Wait for process to finish and return exit code"
+  [process]
+  (Thread/sleep 100)
+  (if (proc/alive? process)
+    true
+    (let [exit-code (:exit @process)]
+      (when-not (zero? exit-code)
+        (throw (ex-info (format "ERROR: process exited with code %s\n" exit-code) {:babashka/exit 13}))))))
 
 (defrecord ATask [command name tags env
                   ;; internal state:
                   ;; the process handle thing
                   process
-                  ;; futures streaming stdout and stderr
-                  ;; TODO: this finally looks like a decent use case for core.async
-                  out-fut
-                  err-fut]
+                  ;; threads streaming stdout and stderr (not futures - no threadpool limits)
+                  out-thread
+                  err-thread]
   component/Lifecycle
   (start [this]
     (if (:running? this)
@@ -68,49 +102,67 @@
       (let [env (merge env {"GP_ID" name})
             {:keys [out err] :as process} (proc/process command {:extra-env env
                                                                  :shutdown proc/destroy-tree})
-            stdout-fut (future
-                         (with-open [rdr (io/reader out)]
-                           (binding [*in* rdr]
-                             (while true
-                               (when-let [line (read-line)]
-                                 (log/infof "[%s] %s" name line))))))
+            _ (wait-for-process process)
+            pid (.pid ^java.lang.Process (:proc process))
+            stdout-thread (Thread.
+                           (fn []
+                             (with-open [rdr (io/reader out)]
+                               (loop []
+                                 (when-let [line (.readLine rdr)]
+                                   (log (format "%s [%s out] %s" (task-name->color-str name) pid line))
+                                   (flush)
+                                   (recur))))))
 
-            stderr-fut (future
-                         (with-open [rdr (io/reader err)]
-                           (binding [*in* rdr]
-                             (while true
-                               (when-let [line (read-line)]
-                                 (log/errorf "[%s] %s" name line))))))]
+            stderr-thread (Thread.
+                           (fn []
+                             (with-open [rdr (io/reader err)]
+                               (loop []
+                                 (when-let [line (.readLine rdr)]
+                                   (log (format "%s [%s err] %s" (task-name->color-str name) pid line))
+                                   (flush)
+                                   (recur))))))]
+
+        (.start stdout-thread)
+        (.start stderr-thread)
 
         (assoc this
                :running? true
                :process process
-               :out-fut stdout-fut
-               :err-fut stderr-fut))))
+               :out-thread stdout-thread
+               :err-thread stderr-thread))))
 
   (stop [this]
     (if (:running? this)
       (do
-        (future-cancel (:out-fut this))
-        (future-cancel (:err-fut this))
-        (let [process (:process this)]
-          (when process
-            (proc/destroy-tree process)))
+        (when-let [process (:process this)]
+          (proc/destroy-tree process))
+
+        (when-let [t (:out-thread this)]
+          (.interrupt t))
+        (when-let [t (:err-thread this)]
+          (.interrupt t))
 
         (assoc this
                :running? false
                :process nil
-               :out-fut nil
-               :err-fut nil))
+               :out-thread nil
+               :err-thread nil))
       this)))
 
+;; TODO: add a bit more machinery to make this whole thing more manageable
+;; - scheduled thread pool executor to poll all processes for status to log when they exit
+;; - a thread pool to manage all of these threads
+
 (defn -main [args]
+  (let [conf-path (fs/expand-home (str (first args)))
+        _ (when-not (fs/exists? conf-path)
+            (println "ERROR: config file %s does not exist" conf-path)
+            (System/exit 12))
+        {:keys [tasks _settings] :as _conf} (load-config (str conf-path))
 
-  (let [conf-path (or (first args) "~/geppetto.yml")
-        conf (load-config conf-path)
+        ;; construct system dynamically
 
-    ;; construct system dynamically
-        sys-map (->> conf
+        sys-map (->> tasks
                      (map (fn [{:keys [name deps] :as task-def}]
                             (let [task (map->ATask task-def)
                                   task (if (seq deps)
@@ -121,7 +173,7 @@
 
                      (into {}))]
 
-    (log/infof "starting geppetto with config %s - %s tasks" conf-path (count sys-map))
+    (printf "Starting geppetto with config %s - %s tasks\n" conf-path (count sys-map))
     (->> (component/map->SystemMap sys-map)
          component/start)
 
