@@ -1,15 +1,20 @@
 (ns geppetto.core
   (:gen-class)
-  (:require [babashka.process :as proc]
-            [babashka.fs :as fs]
-            [clojure.java.io :as io]
-            [clojure.tools.cli :as cli]
-            [com.stuartsierra.component :as component]
-            [clj-yaml.core :as yaml]
-            [malli.core :as m]
-            [malli.error :as me]
-            [clojure.walk :as walk]
-            flatland.ordered.map))
+  (:require
+   [babashka.fs :as fs]
+   [babashka.process :as proc]
+   [clj-yaml.core :as yaml]
+   [clojure.java.io :as io]
+   [clojure.string :as str]
+   [clojure.walk :as walk]
+   [com.stuartsierra.component :as component]
+   flatland.ordered.map
+   [malli.core :as m]
+   [malli.error :as me])
+  (:import
+   [java.io BufferedReader]))
+
+(set! *warn-on-reflection* true)
 
 ;; Schema & config processing
 (def Task
@@ -114,7 +119,7 @@
                            (fn []
                              (with-open [rdr (io/reader out)]
                                (loop []
-                                 (when-let [line (.readLine rdr)]
+                                 (when-let [line (BufferedReader/.readLine rdr)]
                                    (log (format "%s [%s out] %s" (task-name->color-str name) pid line))
                                    (flush)
                                    (recur))))))
@@ -123,7 +128,7 @@
                            (fn []
                              (with-open [rdr (io/reader err)]
                                (loop []
-                                 (when-let [line (.readLine rdr)]
+                                 (when-let [line (BufferedReader/.readLine rdr)]
                                    (log (format "%s [%s err] %s" (task-name->color-str name) pid line))
                                    (flush)
                                    (recur))))))]
@@ -144,9 +149,9 @@
           (proc/destroy-tree process))
 
         (when-let [t (:out-thread this)]
-          (.interrupt t))
+          (Thread/.interrupt t))
         (when-let [t (:err-thread this)]
-          (.interrupt t))
+          (Thread/.interrupt t))
 
         (assoc this
                :running? false
@@ -162,6 +167,9 @@
 ;; TODO use c.t.clii
 (defn -main [& args]
   (let [conf-path (str (fs/expand-home (str (first args))))
+        _ (when (str/blank? conf-path)
+            (println "ERROR: missing config file argument")
+            (System/exit 11))
         _ (when-not (fs/exists? conf-path)
             (println "ERROR: config file '%s' does not exist" conf-path)
             (System/exit 12))

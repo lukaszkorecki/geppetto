@@ -5,16 +5,7 @@
         clj-commons/clj-yaml {:mvn/version "1.0.29"}
         org.clojure/tools.cli {:mvn/version "1.2.245"}
         babashka/process {:mvn/version "0.6.23"}
-        babashka/fs {:mvn/version "0.5.27"}}
+        babashka/fs {:mvn/version "0.5.27"}
+        com.github.clj-easy/graal-build-time {:mvn/version "1.0.5"}}
 
- :aliases {:start {:main-opts ["-m" "geppetto.core"]}
-           :native-image {:main-opts ["-m clj.native-image" "geppetto.core"
-                                      "--initialize-at-build-time"
-                                      "--no-fallback"
-                                      "--report-unsupported-elements-at-runtime"
-                                      "-H:+ReportExceptionStackTraces"
-                                      "--verbose"]
-                          :jvm-opts ["-Dclojure.compiler.direct-linking=true"]
-                          :extra-deps {clj.native-image/clj.native-image
-                                       {:git/url "https://github.com/taylorwood/clj.native-image.git"
-                                        :sha "4604ae76855e09cdabc0a2ecc5a7de2cc5b775d6"}}}}}
+ :aliases {:start {:main-opts ["-m" "geppetto.core"]}}}
