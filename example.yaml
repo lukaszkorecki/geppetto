@@ -1,0 +1,14 @@
+
+- name: test-1
+  command: bb ./test/print-rand.clj
+  tags:
+    - one
+  env:
+    foo: bar
+
+- name: test-2
+  command: bb ./test/print-rand.clj
+  deps:
+    - test-1
+  env:
+    foo: qux

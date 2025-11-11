@@ -1,0 +1,132 @@
+#!/usr/bin/env bb
+(ns geppetto
+  (:require [babashka.process :as proc]
+            [babashka.fs :as fs]
+            [clojure.java.io :as io]
+            [clojure.tools.logging :as log]
+            [com.stuartsierra.component :as component]
+            [clj-yaml.core :as yaml]
+            [malli.core :as m]
+            [malli.error :as me]))
+
+(def Task
+  [:map
+   [:command {:min 1} :string]
+   [:name {:min 1} :string]
+   [:tags {:optional true} [:every [:string {:min 1 :max 32}]]]
+   [:deps {:optional true} [:every :string]]
+   [:env
+    ;; FIXME: we need to also account for numbers
+    [:map-of :keyword :string]]])
+
+(def Tasks
+  [:every #'Task])
+
+(defn verify-config [conf]
+  (when-not (m/validate Tasks conf)
+    (-> (m/explain Tasks conf)
+        me/humanize
+        prn)))
+
+(defn load-config [conf-path]
+
+  (let [abs-path (str (fs/expand-home conf-path))
+        content (slurp abs-path)
+        conf (yaml/parse-string content)]
+    (verify-config conf)
+    conf))
+
+#_(comment
+
+    (defn output-wrapper [proc prefix stream-key]
+      (let [stream (stream-key proc)
+            rdr (io/reader stream)]
+        (doseq [line (line-seq rdr)]
+          (println prefix line))))
+
+    (let [proc1 (process/process "ls")
+          proc2 (process/process "ls" "-la")]
+      (future (output-wrapper proc1 "[A]" :out))
+      (future (output-wrapper proc2 "[B]" :out))
+      (future (output-wrapper proc1 "[A:ERR]" :err))
+      (future (output-wrapper proc2 "[B:ERR]" :err))
+      @proc1
+      @proc2))
+
+(defrecord ATask [command name tags env
+                  ;; internal state:
+                  ;; the process handle thing
+                  process
+                  ;; futures streaming stdout and stderr
+                  ;; TODO: this finally looks like a decent use case for core.async
+                  out-fut
+                  err-fut]
+  component/Lifecycle
+  (start [this]
+    (if (:running? this)
+      this
+      (let [env (merge env {"GP_ID" name})
+            {:keys [out err] :as process} (proc/process command {:extra-env env
+                                                                 :shutdown proc/destroy-tree})
+            stdout-fut (future
+                         (with-open [rdr (io/reader out)]
+                           (binding [*in* rdr]
+                             (while true
+                               (when-let [line (read-line)]
+                                 (log/infof "[%s] %s" name line))))))
+
+            stderr-fut (future
+                         (with-open [rdr (io/reader err)]
+                           (binding [*in* rdr]
+                             (while true
+                               (when-let [line (read-line)]
+                                 (log/errorf "[%s] %s" name line))))))]
+
+        (assoc this
+               :running? true
+               :process process
+               :out-fut stdout-fut
+               :err-fut stderr-fut))))
+
+  (stop [this]
+    (if (:running? this)
+      (do
+        (future-cancel (:out-fut this))
+        (future-cancel (:err-fut this))
+        (let [process (:process this)]
+          (when process
+            (proc/destroy-tree process)))
+
+        (assoc this
+               :running? false
+               :process nil
+               :out-fut nil
+               :err-fut nil))
+      this)))
+
+(defn -main [args]
+
+  (let [conf-path (or (first args) "~/geppetto.yml")
+        conf (load-config conf-path)
+
+    ;; construct system dynamically
+        sys-map (->> conf
+                     (map (fn [{:keys [name deps] :as task-def}]
+                            (let [task (map->ATask task-def)
+                                  task (if (seq deps)
+                                         (component/using task (mapv keyword deps))
+                                         task)]
+
+                              (hash-map (keyword name) task))))
+
+                     (into {}))]
+
+    (log/infof "starting geppetto with config %s - %s tasks" conf-path (count sys-map))
+    (->> (component/map->SystemMap sys-map)
+         component/start)
+
+    (while true
+      (Thread/sleep 100))))
+
+(when (seq *command-line-args*)
+  (-main *command-line-args*))
