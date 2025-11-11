@@ -1,9 +1,18 @@
-{:paths ["."]
- :deps {com.stuartsierra/component {:mvn/version "1.1.0"}
+{:paths ["src"]
+ :deps {org.clojure/clojure {:mvn/version "1.11.1"}
+        com.stuartsierra/component {:mvn/version "1.1.0"}
         metosin/malli {:mvn/version "0.19.2"}
-        clj-commons/clj-yaml {:mvn/version "1.0.29"}
-        babashka/process {:mvn/version "0.6.23"}
-        babashka/fs {:mvn/version "0.5.27"}}
+        clj-commons/clj-yaml {:mvn/version "1.0.27"}
+        org.clojure/tools.cli {:mvn/version "1.2.245"}
+        babashka/process {:mvn/version "0.5.21"}
+        babashka/fs {:mvn/version "0.5.20"}}
 
- :aliases {:start {:main-opts ["-m" "geppetto"]}}
- }
+ :aliases {:start {:main-opts ["-m" "geppetto.core"]}
+           :native-image {:main-opts ["-m clj.native-image geppetto.core"
+                                      "--initialize-at-build-time"
+                                      "--no-fallback"
+                                      "--report-unsupported-elements-at-runtime"
+                                      "-H:+ReportExceptionStackTraces"
+                                      "--verbose"]
+                          :jvm-opts ["-Dclojure.compiler.direct-linking=true"]
+                          :extra-deps {clj.native-image/clj.native-image {:mvn/version "0.5.1"}}}}}
