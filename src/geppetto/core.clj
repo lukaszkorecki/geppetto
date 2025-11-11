@@ -1,4 +1,5 @@
 (ns geppetto.core
+  (:gen-class)
   (:require [babashka.process :as proc]
             [babashka.fs :as fs]
             [clojure.java.io :as io]
