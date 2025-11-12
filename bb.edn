@@ -1,5 +1,0 @@
-{:paths ["src"]
- :deps {;; NOTE: we can't use 1.2.0 because bb can't use records which
-        ;; implement java interfaces (Closeable in this case)
-        com.stuartsierra/component {:mvn/version "1.2.0"}
-        metosin/malli {:mvn/version "0.19.2"}}}
