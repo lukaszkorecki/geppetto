@@ -1,5 +1,9 @@
 # Geppetto
 
+> [!WARNING]
+> Name, configuration format, and some other details are subject to change.
+> Expect breakage until this warning goes away.
+
 Ever wanted something like Docker Compose, but without Docker? [Foreman](https://github.com/ddollar/foreman) is kinda there, but lacks a lot of useful features. [Supervisord](https://supervisord.org/) does way too much. Now there's a simple way.
 
 ## What is Geppetto?
