@@ -22,13 +22,17 @@
    [:command {:min 1} :string]
    [:name {:min 1} :string]
    [:tags {:optional true} [:every [:string {:min 1 :max 32}]]]
+   ;; TODO rename `deps` to whatever Docker Compose calls it
    [:deps {:optional true} [:every :string]]
-   [:env
+   ;; TODO: readiness-probe - a TCP port to check for readiness
+   ;; [:readiness-probe {:optional true} [:map [:port :int :timeout-ms :int]]]
+   [:env {:optional true}
     ;; FIXME: we need to also account for numbers
     [:map-of :keyword :string]]
 
    ;; TODO:
-   ;; {:env-from {:command "...." }}
+   ;; :env-command {:optional true} [:string]} - command to run to get env vars
+   ;; :env-file {:optional true} [:string]} - path to env file to load
    ])
 
 (def TaskConfig

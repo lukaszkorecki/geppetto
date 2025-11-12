@@ -7,9 +7,14 @@ tasks:
   env:
     foo: bar
 
-- me: test-2
+- name: test-2
   command: bb ./test/print-rand.clj
   deps:
     - test-1
   env:
     foo: qux
+
+- name: one-off
+  command: native-image --help
+  env:
+    x: y
