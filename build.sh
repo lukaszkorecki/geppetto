@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-
+rm -rf classes geppetto
 mkdir -p classes
 clojure -M -e "(compile 'geppetto.core)"
 

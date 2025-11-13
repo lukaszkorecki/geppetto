@@ -3,92 +3,16 @@
   (:require
    [babashka.fs :as fs]
    [babashka.process :as proc]
-   [clj-yaml.core :as yaml]
    [clojure.java.io :as io]
    [clojure.string :as str]
-   [clojure.walk :as walk]
    [com.stuartsierra.component :as component]
    flatland.ordered.map
-   [malli.core :as m]
-   [malli.error :as me])
+   [geppetto.config :as config]
+   [geppetto.log :as log])
   (:import
    [java.io BufferedReader]))
 
 (set! *warn-on-reflection* true)
-
-;; Schema & config processing
-(def Task
-  [:map
-   [:command {:min 1} :string]
-   [:name {:min 1} :string]
-   [:tags {:optional true} [:every [:string {:min 1 :max 32}]]]
-   ;; TODO rename `deps` to whatever Docker Compose calls it
-   [:deps {:optional true} [:every :string]]
-   ;; TODO: readiness-probe - a TCP port to check for readiness
-   ;; [:readiness-probe {:optional true} [:map [:port :int :timeout-ms :int]]]
-   [:env {:optional true}
-    ;; FIXME: we need to also account for numbers
-    [:map-of :keyword :string]]
-
-   ;; TODO:
-   ;; :env-command {:optional true} [:string]} - command to run to get env vars
-   ;; :env-file {:optional true} [:string]} - path to env file to load
-   ])
-
-(def TaskConfig
-  [:map
-   [:settings {:optional true}
-  ;; TODO
-    [:map-of :string :string]]
-
-   [:tasks
-    [:every #'Task]]])
-
-(defn verify-config [conf]
-  (when-not (m/validate TaskConfig conf)
-    (println "ERROR: invalid config:")
-    (-> (m/explain TaskConfig conf)
-        me/humanize
-        (yaml/generate-string)
-        println)
-    (System/exit 13)))
-
-(def cl
-  (class (yaml/parse-string "foo: bar")))
-
-(defn load-config [conf-path]
-  (let [content (slurp conf-path)
-        conf (->> (yaml/parse-string content)
-                  (walk/postwalk (fn [thing]
-                                   (if (instance? cl thing)
-                                     (into {} thing)
-                                     thing))))]
-    (verify-config conf)
-    conf))
-
-;; Task output logging
-(def color-codes
-  {0 31 ; red
-   1 32 ; green
-   2 33 ; yellow
-   3 34 ; blue
-   4 35 ; magenta
-   5 36 ; cyan
-   })
-
-(defn task-name->color-str
-  "Calculate hash and return ANSI color code string for task name"
-  [name]
-  (let [hash-code (mod (reduce + (map int name)) 6)
-        color-code (get color-codes hash-code 37)]
-    (str "\u001b[" color-code "m" name "\u001b[0m")))
-
-(defn log
-  "Like print, but threadsafe"
-  [s]
-  (locking *out*
-    (println s)
-    (flush)))
 
 ;; Process management
 
@@ -124,8 +48,7 @@
                              (with-open [rdr (io/reader out)]
                                (loop []
                                  (when-let [line (BufferedReader/.readLine rdr)]
-                                   (log (format "%s [%s out] %s" (task-name->color-str name) pid line))
-                                   (flush)
+                                   (log/emit {:marker name :pid pid :line line :dev :out})
                                    (recur))))))
 
             stderr-thread (Thread.
@@ -133,13 +56,10 @@
                              (with-open [rdr (io/reader err)]
                                (loop []
                                  (when-let [line (BufferedReader/.readLine rdr)]
-                                   (log (format "%s [%s err] %s" (task-name->color-str name) pid line))
-                                   (flush)
+                                   (log/emit {:marker name :pid pid :line line :dev :err})
                                    (recur))))))]
-
         (.start stdout-thread)
         (.start stderr-thread)
-
         (assoc this
                :running? true
                :process process
@@ -154,6 +74,7 @@
 
         (when-let [t (:out-thread this)]
           (Thread/.interrupt t))
+
         (when-let [t (:err-thread this)]
           (Thread/.interrupt t))
 
@@ -164,41 +85,39 @@
                :err-thread nil))
       this)))
 
+(defn- build-system [tasks]
+  (let [task-sys (->> tasks
+                      (map (fn [{:keys [name deps] :as task-def}]
+                             (let [task (map->ATask task-def)
+                                   task (if (seq deps)
+                                          (component/using task (mapv keyword deps))
+                                          task)]
+                               (hash-map (keyword name) task))))
+                      (into {}))]
+    (component/map->SystemMap task-sys)))
+
 ;; TODO: add a bit more machinery to make this whole thing more manageable
 ;; - scheduled thread pool executor to poll all processes for status to log when they exit
 ;; - a thread pool to manage all of these threads
 
 ;; TODO use c.t.clii
+
+(def sys (atom nil))
+
 (defn -main [& args]
-  (let [conf-path (str (fs/expand-home (str (first args))))
-        _ (when (str/blank? conf-path)
-            (println "ERROR: missing config file argument")
-            (System/exit 11))
-        _ (when-not (fs/exists? conf-path)
-            (println "ERROR: config file '%s' does not exist" conf-path)
-            (System/exit 12))
-        {:keys [tasks _settings] :as _conf} (load-config conf-path)
+  (Runtime/.addShutdownHook (Runtime/getRuntime)
+                            (Thread. ^Runnable (fn []
+                                                 (printf "Shutting down geppetto...\n")
+                                                 (swap! sys #(when %
+                                                               (component/stop %)))
+                                                 (printf "Shutdown complete.\n"))))
+  (let [conf-path (str (first args))
+        {:keys [tasks _settings] :as _conf} (config/load! conf-path)
 
-        ;; construct system dynamically
-
-        sys-map (->> tasks
-                     (map (fn [{:keys [name deps] :as task-def}]
-                            (let [task (map->ATask task-def)
-                                  task (if (seq deps)
-                                         (component/using task (mapv keyword deps))
-                                         task)]
-
-                              (hash-map (keyword name) task))))
-
-                     (into {}))]
+        sys-map (build-system tasks)]
 
     (printf "Starting geppetto with config %s - %s tasks\n" conf-path (count sys-map))
-    (->> (component/map->SystemMap sys-map)
-         component/start)
+    (reset! sys (component/start-system sys-map))
 
     (while true
       (Thread/sleep 100))))
-
-;; entrypoint for bb
-(when (= *file* (System/getProperty "babashka.file"))
-  (apply -main *command-line-args*))
