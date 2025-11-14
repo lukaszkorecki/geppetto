@@ -107,6 +107,7 @@
 (defn -main [& args]
   (Runtime/.addShutdownHook (Runtime/getRuntime)
                             (Thread. ^Runnable (fn []
+                                                 (shutdown-agents)
                                                  (printf "Shutting down geppetto...\n")
                                                  (swap! sys #(when %
                                                                (component/stop %)))
