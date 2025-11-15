@@ -19,15 +19,17 @@
 (defn wait-for-process
   "Wait for process to finish and return exit code"
   [process]
-  (Thread/sleep 100)
   (if (proc/alive? process)
-    true
+    {:status ::alive}
     (let [exit-code (:exit @process)]
-      (when-not (zero? exit-code)
-        (printf "ERROR: process exited with code %s\n" exit-code)
-        (System/exit exit-code)))))
+      (if (zero? exit-code)
+        {:status ::clean-exit :exit-code 0}
+        {:status ::error-exit :exit-code exit-code}))))
 
-(defrecord ATask [command name tags env
+(defrecord ATask [command name tags env dir
+                  ;; TODO
+                  env_command
+                  env_file
                   ;; internal state:
                   ;; the process handle thing
                   process
@@ -40,6 +42,7 @@
       this
       (let [env (merge env {"GP_ID" name})
             {:keys [out err] :as process} (proc/process command {:extra-env env
+                                                                 :dir dir
                                                                  :shutdown proc/destroy-tree})
             _ (wait-for-process process)
             pid (.pid ^java.lang.Process (:proc process))
@@ -87,10 +90,10 @@
 
 (defn- build-system [tasks]
   (let [task-sys (->> tasks
-                      (map (fn [{:keys [name deps] :as task-def}]
+                      (map (fn [{:keys [name depends_on] :as task-def}]
                              (let [task (map->ATask task-def)
-                                   task (if (seq deps)
-                                          (component/using task (mapv keyword deps))
+                                   task (if-let [dependencies (not-empty (mapv keyword (seq depends_on)))]
+                                          (component/using task dependencies)
                                           task)]
                                (hash-map (keyword name) task))))
                       (into {}))]
