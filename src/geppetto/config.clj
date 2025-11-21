@@ -27,6 +27,12 @@
     {:description "A list of tags to categorize or group the task"
      :optional true}
     [:every [:string {:min 1 :max 32}]]]
+
+   [:dir
+    {:description "Working directory for the process"
+     :optional true }
+    [:string {:min 1 }]]
+
    [:depends_on
     {:description "Other task names that this task depends on; must exist in config"
      :optional true}
@@ -42,6 +48,7 @@
     {:description "Shell command to run that provides env vars for the task - usually this would be your secret manager of choice"
      :optional true}
     :string]
+
    [:env_file
     {:description "Path to a file to load environment variables from for the task. Can be absolute or relative  to :dir if specified, otherwise  relative to config root"
      :optional true}
@@ -53,18 +60,18 @@
    ;; - output format (text or json)
    ;; - default workdir, to override resolving relative paths based on config file location
    [:settings
-    {:optional true
-     :description "Global settings for the task runner"}
-    [:output_format
-     {:description "Output format for task runner logs"
-      :optional true}
-     [:enum "text" "json"]]
+    {:optional true :description "Global settings for the task runner"}
+    [:map
+     [:output_format
+      {:description "Output format for task runner logs"
+       :optional true}
+      [:enum "text" "json"]]
 
-    [:default_workdir
-     {:description "Default working directory for tasks with relative paths"
-      :optional true
-      :min 1}
-     :string]]
+     [:default_workdir
+      {:description "Default working directory for tasks with relative paths"
+       :optional true
+       :min 1}
+      :string]]]
 
    [:tasks
     [:every #'Task]]])
@@ -80,31 +87,32 @@
   conf)
 
 (defn- resolve-task-dir [{:keys [dir] :as task} {:keys [config-file-dir]}]
+  (printf "%s ->%s \n" dir config-file-dir)
   (cond
-                   ;; bail out - nothing to do
-   (not dir)
-   task
+    ;; bail out - nothing to do
+    (not dir)
+    task
 
-                   ;; bail out - nothing to do
-   (and (not-empty dir) (fs/absolute? dir) (fs/exists? dir))
-   task
+    ;; bail out - nothing to do
+    (and (not-empty dir) (fs/absolute? dir) (fs/exists? dir))
+    task
 
-                   ;; we have a dir, it's absolute, but it doesn't exist
-   (and (not-empty dir) (fs/absolute? dir) (not (fs/exists? dir)))
-   (errors/raise! ::errors/task-dir-doesnt-exist
-                  #(println (format "ERROR: task '%s' has a working directory that doesn't exist: %s"
-                                    (:name task) dir)))
+    ;; we have a dir, it's absolute, but it doesn't exist
+    (and (not-empty dir) (fs/absolute? dir) (not (fs/exists? dir)))
+    (errors/raise! ::errors/task-dir-doesnt-exist
+                   #(println (format "ERROR: task '%s' has a working directory that doesn't exist: %s"
+                                     (:name task) dir)))
 
-                ;; we have a dir, it's relative - resolve it
-   (and (not-empty dir) (not (fs/absolute? dir)))
-   (let [final-path (-> (str config-file-dir "/" dir)
-                        fs/absolutize
-                        fs/normalize)]
-     (if (fs/exists? final-path)
-       (assoc task :dir (str final-path))
-       (errors/raise! ::errors/task-dir-doesnt-exist
-                      #(println (format "ERROR: task '%s' has a working directory that doesn't exist: %s"
-                                        (:name task) final-path)))))))
+    ;; we have a dir, it's relative - resolve it
+    (and (not-empty dir) (not (fs/absolute? dir)))
+    (let [final-path (-> (str config-file-dir "/" dir)
+                         fs/absolutize
+                         fs/normalize)]
+      (if (fs/exists? final-path)
+        (assoc task :dir (str final-path))
+        (errors/raise! ::errors/task-dir-doesnt-exist
+                       #(println (format "ERROR: task '%s' has a working directory that doesn't exist: %s"
+                                         (:name task) final-path)))))))
 
 (defn parse-env-file [env-file-path]
   (->> (env-file-path)
@@ -140,7 +148,7 @@
                        (->> tasks
                             (mapv (fn [task]
                                     (-> task
-                                        (resolve-task-dir {:config-file config-file-dir})
+                                        (resolve-task-dir {:config-file-dir config-file-dir})
                                         (resolve-env {:config-file-dir config-file-dir})))))))))
 
 ;; FIXME: why do we need to do this?
@@ -154,7 +162,7 @@
         _ (when-not (fs/exists? conf-path)
             (errors/raise! ::errors/config-not-found))
         ;; we're good to go
-        config-file-dir (str (fs/absolutize (fs/parent conf-path)))
+        config-file-dir (str (fs/normalize (fs/absolutize (fs/parent conf-path))))
         conf-data (->> (yaml/parse-string (slurp (str conf-path)))
                        ;; convert ordered-map to regular maps, they're easier to work with
                        (walk/postwalk (fn [thing]

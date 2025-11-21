@@ -8,4 +8,5 @@
         babashka/fs {:mvn/version "0.5.27"}
         com.github.clj-easy/graal-build-time {:mvn/version "1.0.5"}}
 
- :aliases {:start {:main-opts ["-m" "geppetto.core"]}}}
+ :aliases {:start {:main-opts ["-m" "geppetto.core"]
+                   :jvm-opts ["-Dclojure.main.report=stderr"]}}}

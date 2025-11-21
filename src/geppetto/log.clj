@@ -26,5 +26,10 @@
   "Like print, but threadsafe"
   [{:keys [marker _pid line dev]}]
   (locking *out*
-    (println (str (colorize marker) (format ".%s | %s " (name dev) line)))
+    ;; FIXME: this is pretty awful
+    (println (str (colorize marker) (format "%s | %s "
+                                            (if-let [d (not-empty (name (or dev "")))]
+                                             (str "." d)
+                                              "")
+                                            line)))
     (flush)))
