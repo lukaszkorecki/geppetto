@@ -6,17 +6,20 @@ tasks:
 
   - name: simple-relative
     command: ./test/process-simulator.clj --print-interval-ms=500
+    env:
+      foo: woah.foo
 
   - name: very-relative
     command: ./geppetto/test/process-simulator.clj --print-interval-ms=500
     dir: ../
 
-  - name: i-will-crash
-    command: ./process-simulator.clj --print-interval-ms=500 -e 12 -f 100
-    dir: ./test
 
   - name: web-server-ok
     command: ./test/process-simulator.clj -w 3001
 
-  - name: web-server-unhealthy
-    command: ./test/process-simulator.clj -w 3002 -F
+  # - name: web-server-unhealthy
+  #   command: ./test/process-simulator.clj -w 3002 -F
+
+  # - name: i-will-crash
+  #   command: ./process-simulator.clj --print-interval-ms=500 -e 12 -f 100
+  #   dir: ./test

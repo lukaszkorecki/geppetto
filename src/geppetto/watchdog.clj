@@ -21,7 +21,7 @@
       (let [store (atom {})]
         (add-watch store ::process-watcher (fn [_k _ref _os state]
                                              (let [running-tasks-count (count (filter :alive? (vals state)))
-                                                   unclean-exits (into {} (filter (fn [[_ {:keys [alive?]}]] alive?) x))]
+                                                   unclean-exits (into {} (filter (fn [[_ {:keys [alive?]}]] alive?) state))]
                                                (when (zero? running-tasks-count)
                                                  (log/warn "Exiting. All tasks have exited. Exit stage left."
                                                            {:level "WARN"})

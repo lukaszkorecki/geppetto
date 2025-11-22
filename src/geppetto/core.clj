@@ -27,7 +27,8 @@
         task-sys (assoc task-sys :watchdog (watchdog/create {:exit-mode #_:keep-going :fail-fast
                                                              :expected-count (count tasks)
                                                              :stop-fn (fn [{:keys [exit]}]
-                                                                        (component/stop @sys)
+                                                                        (when-let [sys' @sys]
+                                                                          (component/stop sys'))
                                                                         (shutdown-agents)
                                                                         (System/exit exit))}))]
 
@@ -43,7 +44,8 @@
   (Runtime/.addShutdownHook (Runtime/getRuntime)
                             (Thread. ^Runnable (fn []
                                                  (shutdown-agents)
-                                                 (component/stop @sys))))
+                                                 (when-let [sys' @sys]
+                                                   (component/stop sys')))))
   (let [conf-path (str (first args))
         {:keys [tasks _settings] :as _conf} (config/load! conf-path)
 
