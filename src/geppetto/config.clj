@@ -87,7 +87,6 @@
   conf)
 
 (defn- resolve-task-dir [{:keys [dir] :as task} {:keys [config-file-dir]}]
-  (printf "%s ->%s \n" dir config-file-dir)
   (cond
     ;; bail out - nothing to do
     (not dir)

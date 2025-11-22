@@ -39,8 +39,7 @@
 
 (defn -main [& args]
   (Runtime/.addShutdownHook (Runtime/getRuntime)
-                            (Thread. ^Runnable (fn []
-                                                 (component/stop @sys))))
+                            (Thread. ^Runnable #(component/stop @sys)))
   (let [conf-path (str (first args))
         {:keys [tasks _settings] :as _conf} (config/load! conf-path)
 
