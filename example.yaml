@@ -4,9 +4,12 @@ tasks:
     command: ./process-simulator.clj --print-interval-ms=500
     dir: ./test
 
-  - name: simple-relative
-    command: ./test/process-simulator.clj --print-interval-ms=500
+  # - name: simple-relative
+  #   command: ./test/process-simulator.clj --print-interval-ms=500
 
-  - name: very-relative
-    command: ./geppetto/test/process-simulator.clj --print-interval-ms=500
-    dir: ../
+  # - name: very-relative
+  #   command: ./geppetto/test/process-simulator.clj --print-interval-ms=500
+  #   dir: ../
+  - name: exiting
+    command: ./process-simulator.clj --print-interval-ms=500 -e 12 -f 100
+    dir: ./test

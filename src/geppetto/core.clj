@@ -4,21 +4,31 @@
    [com.stuartsierra.component :as component]
    [geppetto.config :as config]
    [geppetto.log :as log]
+   [geppetto.watchdog :as watchdog]
    [geppetto.task :as task]))
 
 (set! *warn-on-reflection* true)
 
-;; Process management
+(def sys (atom nil))
 
 (defn- build-system [tasks]
   (let [task-sys (->> tasks
                       (map (fn [{:keys [name depends_on] :as task-def}]
                              (let [task (task/create task-def)
-                                   task (if-let [dependencies (not-empty (mapv keyword (seq depends_on)))]
-                                          (component/using task dependencies)
-                                          task)]
+                                   dependencies (mapv keyword (seq depends_on))
+                                   task (component/using
+                                         task
+                                         (vec (concat [:watchdog] dependencies)))]
+
                                (hash-map (keyword name) task))))
-                      (into {}))]
+                      (into {}))
+
+        task-sys (assoc task-sys :watchdog (watchdog/create {:exit-mode :keep-going ; :fail-fast
+                                                             :stop-fn (fn [{:keys [exit]}]
+                                                                        (component/stop @sys)
+                                                                        (shutdown-agents)
+                                                                        (System/exit exit))}))]
+
     (component/map->SystemMap task-sys)))
 
 ;; TODO: add a bit more machinery to make this whole thing more manageable
@@ -27,23 +37,17 @@
 
 ;; TODO use c.t.clii
 
-(def sys (atom nil))
-
 (defn -main [& args]
   (Runtime/.addShutdownHook (Runtime/getRuntime)
                             (Thread. ^Runnable (fn []
-                                                 (shutdown-agents)
-                                                 (log/emit {:marker "EXIT"
-                                                            :line "Shutting down geppetto..."})
-                                                 (swap! sys #(when %
-                                                               (component/stop %))))))
+                                                 (component/stop @sys))))
   (let [conf-path (str (first args))
         {:keys [tasks _settings] :as _conf} (config/load! conf-path)
 
         sys-map (build-system tasks)]
 
     (log/emit {:marker "START"
-               :line (format "Starting geppetto with config %s - %s tasks\n" conf-path (count sys-map))})
+               :line (format "Starting geppetto with config %s - %s tasks\n" conf-path (dec (count sys-map)))})
     (reset! sys (component/start-system sys-map))
 
     (while true
