@@ -1,0 +1,4 @@
+tasks:
+  - name: time
+    command: time
+    dir: ./bin
