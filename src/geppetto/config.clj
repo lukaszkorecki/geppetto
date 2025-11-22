@@ -1,7 +1,7 @@
 (ns geppetto.config
   (:refer-clojure :exclude [resolve])
   (:require
-   [geppetto.log :as log]
+   [mokujin.log :as log]
    [geppetto.errors :as errors]
    [babashka.fs :as fs]
    [clj-yaml.core :as yaml]
@@ -30,8 +30,8 @@
 
    [:dir
     {:description "Working directory for the process"
-     :optional true }
-    [:string {:min 1 }]]
+     :optional true}
+    [:string {:min 1}]]
 
    [:depends_on
     {:description "Other task names that this task depends on; must exist in config"
@@ -79,7 +79,8 @@
 (defn verify! [conf]
   (when-not (m/validate TaskConfig conf)
     (errors/raise! ::errors/invalid-config (fn []
-                                             (println "ERROR: invalid config:")
+                                             (log/with-context {:level "ERROR"}
+                                               (log/error "invalid config!"))
                                              (-> (m/explain TaskConfig conf)
                                                  me/humanize
                                                  (yaml/generate-string)
@@ -89,29 +90,29 @@
 (defn- resolve-task-dir [{:keys [dir] :as task} {:keys [config-file-dir]}]
   (cond
     ;; bail out - nothing to do
-    (not dir)
-    task
+   (not dir)
+   task
 
     ;; bail out - nothing to do
-    (and (not-empty dir) (fs/absolute? dir) (fs/exists? dir))
-    task
+   (and (not-empty dir) (fs/absolute? dir) (fs/exists? dir))
+   task
 
     ;; we have a dir, it's absolute, but it doesn't exist
-    (and (not-empty dir) (fs/absolute? dir) (not (fs/exists? dir)))
-    (errors/raise! ::errors/task-dir-doesnt-exist
-                   #(println (format "ERROR: task '%s' has a working directory that doesn't exist: %s"
-                                     (:name task) dir)))
+   (and (not-empty dir) (fs/absolute? dir) (not (fs/exists? dir)))
+   (errors/raise! ::errors/task-dir-doesnt-exist
+                  #(log/errorf "ERROR: task '%s' specifies a working directory that doesn't exist: %s"
+                     (:name task) dir))
 
     ;; we have a dir, it's relative - resolve it
-    (and (not-empty dir) (not (fs/absolute? dir)))
-    (let [final-path (-> (str config-file-dir "/" dir)
-                         fs/absolutize
-                         fs/normalize)]
-      (if (fs/exists? final-path)
-        (assoc task :dir (str final-path))
-        (errors/raise! ::errors/task-dir-doesnt-exist
-                       #(println (format "ERROR: task '%s' has a working directory that doesn't exist: %s"
-                                         (:name task) final-path)))))))
+   (and (not-empty dir) (not (fs/absolute? dir)))
+   (let [final-path (-> (str config-file-dir "/" dir)
+                        fs/absolutize
+                        fs/normalize)]
+     (if (fs/exists? final-path)
+       (assoc task :dir (str final-path))
+       (errors/raise! ::errors/task-dir-doesnt-exist
+                      #(log/errorf "task '%s' specifies a working directory that doesn't exist: %s"
+                                   (:name task) final-path))))))
 
 (defn parse-env-file [env-file-path]
   (->> (env-file-path)
@@ -132,8 +133,9 @@
       (if (fs/exists? resolved-path)
         (update task :env merge (parse-env-file resolved-path))
         (errors/raise! ::errors/task-env-file-doesnt-exist
-                       #(println (format "ERROR: task '%s' has an env_file that doesn't exist: %s"
-                                         (:name task) resolved-path)))))
+                       #(log/errorf "task '%s' has an env_file that doesn't exist: %s"
+                                    (:name task) resolved-path))))
+
     task))
 
 (defn resolve

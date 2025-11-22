@@ -4,7 +4,8 @@
    [clojure.java.io :as io]
    [com.stuartsierra.component :as component]
    [geppetto.watchdog :as dog]
-   [geppetto.log :as log])
+   [geppetto.logger :as logger]
+   [mokujin.log :as log])
   (:import
    [java.io BufferedReader]))
 
@@ -56,7 +57,8 @@
                              (with-open [rdr (io/reader out)]
                                (loop []
                                  (when-let [line (BufferedReader/.readLine rdr)]
-                                   (log/emit {:marker name :line line :dev :out})
+                                   #_{:clj-kondo/ignore [:mokujin.log/log-message-not-string]}
+                                   (log/info line {:task (logger/colorize name)})
                                    (recur))))))
 
             stderr-thread (Thread.
@@ -64,7 +66,8 @@
                              (with-open [rdr (io/reader err)]
                                (loop []
                                  (when-let [line (BufferedReader/.readLine rdr)]
-                                   (log/emit {:marker name :line line :dev :err})
+                                   #_{:clj-kondo/ignore [:mokujin.log/error-log-map-args]}
+                                   (log/error line {:task (logger/colorize name) :dev "stderr"})
                                    (recur))))))]
         (.start stdout-thread)
         (.start stderr-thread)

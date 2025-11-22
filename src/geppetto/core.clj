@@ -3,7 +3,8 @@
   (:require
    [com.stuartsierra.component :as component]
    [geppetto.config :as config]
-   [geppetto.log :as log]
+   geppetto.logger
+   [mokujin.log :as log]
    [geppetto.watchdog :as watchdog]
    [geppetto.task :as task]))
 
@@ -23,7 +24,8 @@
                                (hash-map (keyword name) task))))
                       (into {}))
 
-        task-sys (assoc task-sys :watchdog (watchdog/create {:exit-mode :keep-going ; :fail-fast
+        task-sys (assoc task-sys :watchdog (watchdog/create {:exit-mode #_:keep-going :fail-fast
+                                                             :expected-count (count tasks)
                                                              :stop-fn (fn [{:keys [exit]}]
                                                                         (component/stop @sys)
                                                                         (shutdown-agents)
@@ -39,14 +41,16 @@
 
 (defn -main [& args]
   (Runtime/.addShutdownHook (Runtime/getRuntime)
-                            (Thread. ^Runnable #(component/stop @sys)))
+                            (Thread. ^Runnable (fn []
+                                                 (shutdown-agents)
+                                                 (component/stop @sys))))
   (let [conf-path (str (first args))
         {:keys [tasks _settings] :as _conf} (config/load! conf-path)
 
         sys-map (build-system tasks)]
 
-    (log/emit {:marker "START"
-               :line (format "Starting geppetto with config %s - %s tasks\n" conf-path (dec (count sys-map)))})
+    (log/with-context {:event "START"}
+      (log/infof "Starting geppetto with config %s - %s tasks\n" conf-path (dec (count sys-map))))
     (reset! sys (component/start-system sys-map))
 
     (while true

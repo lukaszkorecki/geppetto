@@ -2,33 +2,34 @@
 
 (require '[clojure.tools.cli :refer [parse-opts]]
          '[org.httpkit.server :as http]
-         '[cheshire.core :as json])
+         '[cheshire.core :as json]
+         '[clojure.tools.logging :as log])
 
 (def cli-options
   [["-e" "--exit-with EXIT_CODE" "Exit with specified exit code (default: 0)"
     :default 0
     :parse-fn #(Integer/parseInt %)
     :validate [#(and (>= % 0) (<= % 255)) "Must be between 0 and 255"]]
-   
+
    ["-f" "--fail-after-ms MS" "Exit after specified milliseconds (never exit if not set)"
     :parse-fn #(Long/parseLong %)
     :validate [#(> % 0) "Must be positive"]]
-   
+
    ["-p" "--[no-]print-output" "Print random numbers to stdout (default: true)"
     :default true]
-   
+
    ["-i" "--print-interval-ms MS" "How often to print output in milliseconds (default: 100)"
     :default 100
     :parse-fn #(Long/parseLong %)
     :validate [#(> % 0) "Must be positive"]]
-   
+
    ["-w" "--web-server-port PORT" "Boot in web-server mode on specified port"
     :parse-fn #(Integer/parseInt %)
     :validate [#(and (> % 0) (< % 65536)) "Must be a valid port number"]]
-   
+
    ["-F" "--fail-health-check" "Make health check endpoint fail (default: false)"
     :default false]
-   
+
    ["-h" "--help" "Show this help message"]])
 
 (defn usage [options-summary]
@@ -55,7 +56,7 @@
        (clojure.string/join \newline errors)))
 
 (defn exit [status msg]
-  (println msg)
+  (log/info msg)
   (System/exit status))
 
 ;; Web server handlers
@@ -73,7 +74,7 @@
   {:status 200
    :headers {"Content-Type" "application/json"}
    :body (json/generate-string {:rand-int (rand-int 10000)
-                                 :timestamp (System/currentTimeMillis)})})
+                                :timestamp (System/currentTimeMillis)})})
 
 (defn router [fail-health?]
   (fn [req]
@@ -90,58 +91,57 @@
   (let [{:keys [print-output print-interval-ms fail-after-ms exit-with]} opts]
     (loop []
       (when print-output
-        (printf "%s - %s - %s\n" 
-                (or (System/getenv "GP_ID") "no-id")
-                (or (System/getenv "foo") "no-foo")
-                (rand-int 10000))
+        (log/infof "%s - %s - %s"
+                   (or (System/getenv "foo") "no-foo")
+                   (rand-nth ["apple" "banana" "cherry" "date" "elderberry"])
+                   (rand-int 10000))
         (flush))
-      
+
       ;; Check if we should exit (simulate crash/success/failure)
       (when fail-after-ms
         (let [elapsed (- (System/currentTimeMillis) start-time)]
           (when (>= elapsed fail-after-ms)
-            (println (format "Exiting after %dms with code %d" elapsed exit-with))
+            (log/warnf "Exiting after %dms with code %d" elapsed exit-with)
             (System/exit exit-with))))
-      
+
       (Thread/sleep print-interval-ms)
       (recur))))
 
 (defn run-web-server [opts]
   ;; Simulates a process in 'service' mode, responding to health/output endpoints.
   (let [{:keys [web-server-port fail-health-check fail-after-ms exit-with]} opts
-        start-time (System/currentTimeMillis)
         server (http/run-server (router fail-health-check) {:port web-server-port})]
-    
-    (println (format "Web server started on port %d" web-server-port))
-    (println (format "  Health endpoint: http://localhost:%d/health (status: %s)"
-                     web-server-port
-                     (if fail-health-check "failing" "healthy")))
-    (println (format "  Output endpoint: http://localhost:%d/output" web-server-port))
-    
+
+    (log/infof "Web server started on port %d" web-server-port)
+    (log/infof "  Health endpoint: http://localhost:%d/health (status: %s)"
+               web-server-port
+               (if fail-health-check "failing" "healthy"))
+    (log/infof "  Output endpoint: http://localhost:%d/output" web-server-port)
+
     ;; Simulate process lifetime (runs then exits or blocks forever)
     (if fail-after-ms
       (do
-        (println (format "Server will exit after %dms with code %d" fail-after-ms exit-with))
+        (log/infof "Server will exit after %dms with code %d" fail-after-ms exit-with)
         (Thread/sleep fail-after-ms)
         (server)
-        (println (format "Exiting after %dms with code %d" fail-after-ms exit-with))
+        (log/warnf "Exiting after %dms with code %d" fail-after-ms exit-with)
         (System/exit exit-with))
       (do
-        (println "Press Ctrl-C to stop")
+        (log/info "Press Ctrl-C to stop")
         ;; Block forever
         @(promise)))))
 
 (defn -main [& args]
-  (let [{:keys [options arguments errors summary]} (parse-opts args cli-options)]
-    
+  (let [{:keys [options errors summary]} (parse-opts args cli-options)]
+
     ;; Handle help and errors
     (cond
-      (:help options)
-      (exit 0 (usage summary))
-      
-      errors
-      (exit 1 (error-msg errors)))
-    
+     (:help options)
+     (exit 0 (usage summary))
+
+     errors
+     (exit 1 (error-msg errors)))
+
     (let [start-time (System/currentTimeMillis)]
       ;; Decide mode based on options
       (if (:web-server-port options)

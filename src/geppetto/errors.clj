@@ -1,5 +1,7 @@
 (ns geppetto.errors
-  "Convinence around building and raising typed errors.")
+  "Convinence around building and raising typed errors."
+  (:require
+   [mokujin.log :as log]))
 
 (def registry
   {::unknown {:message "An unknown error occurred."}
@@ -41,7 +43,10 @@
           (flush)
           (binding [*out* *err*]
             (flush))
-          (printf "FATAL ERROR: [%s] %s\n" (-> exc ex-data ::type) (ex-message exc))
+          (log/with-context {:level "FATAL"}
+            (if-let [err-type (-> exc ex-data ::type)]
+              (log/errorf "[%s] %s\n" err-type (ex-message exc))
+              (log/errorf "%s\n" (ex-message exc))))
           (System/exit exit-code))
         ;; suppressed fatal error exit - used in tests
         (throw (ex-info "suppressed fatal error" (ex-data exc) exc)))
