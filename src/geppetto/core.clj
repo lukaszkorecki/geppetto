@@ -4,6 +4,7 @@
    [com.stuartsierra.component :as component]
    [geppetto.config :as config]
    geppetto.logger
+   [geppetto.cli :as cli]
    [mokujin.log :as log]
    [geppetto.watchdog :as watchdog]
    [geppetto.task :as task]))
@@ -35,15 +36,15 @@
     (component/map->SystemMap task-sys)))
 
 (defn -main [& args]
-  (let [conf-path (str (first args))
-        {:keys [tasks _settings] :as _conf} (config/load! conf-path)
+  (let [config-file (str (first args))
+        {:keys [tasks _settings] :as _conf} (config/load! config-file)
         ;; TODO: Parse from CLI flags once implemented
         ;; Options: :keep-going, :fail-fast, :exit-on-any-completion, :exit-on-all-completion
         exit-mode :fail-fast
         sys-map (build-system tasks exit-mode)]
 
     (log/with-context {:event "START"}
-      (log/infof "Starting geppetto with config %s - %s tasks\n" conf-path (dec (count sys-map))))
+      (log/infof "Starting geppetto with config %s - %s tasks\n" config-file (dec (count sys-map))))
     (reset! sys (component/start-system sys-map))
 
     (while true

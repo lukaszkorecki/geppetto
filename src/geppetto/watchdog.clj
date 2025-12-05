@@ -15,20 +15,19 @@
                                     (not (zero? (task/exit-code t)))))
                        exited)]
 
-
     (log/debugf ">>>  %s" (update-vals tasks task/alive?))
 
     (case exit-mode
-      :keep-going nil
-      :fail-fast (when (seq failed)
-                   {:exit 1
-                    :reason (str "Tasks failed: " (->> failed (map :name) sort vec))})
-      :exit-on-any-completion (when (seq exited)
-                                {:exit (if (seq failed) 1 0)
-                                 :reason (str "Task completed: " (->> exited first :name))})
-      :exit-on-all-completion (when (empty? running)
-                                {:exit (if (seq failed) 1 0)
-                                 :reason "All tasks completed"})
+      ::keep-going nil
+      ::fail-fast (when (seq failed)
+                    {:exit 1
+                     :reason (str "Tasks failed: " (->> failed (map :name) sort vec))})
+      ::exit-on-any-completion (when (seq exited)
+                                 {:exit (if (seq failed) 1 0)
+                                  :reason (str "Task completed: " (->> exited first :name))})
+      ::exit-on-all-completion (when (empty? running)
+                                 {:exit (if (seq failed) 1 0)
+                                  :reason "All tasks completed"})
       nil)))
 
 (defrecord Watchdog [;; inputs
