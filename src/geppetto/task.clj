@@ -29,28 +29,16 @@
                   env_file
 
                   ;; internal state:
-                  ;; the process handle thing
                   process
-                  ;; threads streaming stdout and stderr (not futures - no threadpool limits)
                   out-thread
                   err-thread
-                  ;; boolean-atom
-                  running?]
+                  monitor-thread]
   component/Lifecycle
   (start [this]
-    (if (and (:running? this) @(:running? this))
+    (if (:process this)
       this
       (let [env (merge env {"GP_ID" name})
-            running? (atom true)
-            {:keys [out err] :as process} (proc/process command {:extra-env env
-                                                                 :dir dir
-                                                                 :shutdown (fn [proc]
-                                                                             (reset! running? false)
-                                                                             (dog/mark-exited (:watchdog this)
-                                                                                              {:name name
-                                                                                               :clean? (zero? (:exit @proc))})
-                                                                             (proc/destroy-tree proc))})
-            _ (wait-for-process process)
+            {:keys [out err] :as process} (proc/process command {:extra-env env :dir dir})
 
             stdout-thread (Thread.
                            (fn []
@@ -68,36 +56,41 @@
                                  (when-let [line (BufferedReader/.readLine rdr)]
                                    #_{:clj-kondo/ignore [:mokujin.log/error-log-map-args]}
                                    (log/error line {:task (logger/colorize name) :dev "stderr"})
-                                   (recur))))))]
+                                   (recur))))))
+
+            monitor-thread (Thread.
+                            (fn []
+                              (try
+                                (let [exit-code (:exit @process)]
+                                  (dog/mark-exited (:watchdog this) name (zero? exit-code)))
+                                (catch Exception e
+                                  (log/error "Error monitoring process" {:task name :error (ex-message e)})))))]
+
         (.start stdout-thread)
         (.start stderr-thread)
+        (.start monitor-thread)
 
-        (dog/mark-started (:watchdog this) {:name name})
+        (dog/mark-started (:watchdog this) name)
         (assoc this
-               :running? running?
                :process process
                :out-thread stdout-thread
-               :err-thread stderr-thread))))
+               :err-thread stderr-thread
+               :monitor-thread monitor-thread))))
 
   (stop [this]
-    (if @(:running? this)
-      (do
-        (when-let [process (:process this)]
-          (proc/destroy-tree process))
+    (when-let [process (:process this)]
+      (when (proc/alive? process)
+        (proc/destroy-tree process))
 
-        (reset! running? false)
-        (dog/mark-exited (:watchdog this) {:name name :clean? true})
+      (when-let [t (:out-thread this)] (.interrupt t))
+      (when-let [t (:err-thread this)] (.interrupt t))
+      (when-let [t (:monitor-thread this)] (.interrupt t))
 
-        (when-let [t (:out-thread this)] (Thread/.interrupt t))
-
-        (when-let [t (:err-thread this)] (Thread/.interrupt t))
-
-        (assoc this
-               :running? (atom false)
-               :process nil
-               :out-thread nil
-               :err-thread nil))
-      this)))
+      (assoc this
+             :process nil
+             :out-thread nil
+             :err-thread nil
+             :monitor-thread nil))))
 
 (defn create [task-def]
   (map->ATask task-def))

@@ -3,9 +3,31 @@
    [com.stuartsierra.component :as component]
    [mokujin.log :as log]))
 
-(defprotocol IWatch ; lol
-  (mark-started [this {:keys [name]}])
-  (mark-exited [this {:keys [name clean?]}]))
+(defprotocol IWatch
+  (mark-started [this task-name])
+  (mark-exited [this task-name clean?]))
+
+(defn- should-exit?
+  "Determines if geppetto should exit based on exit-mode and current task states.
+  Returns {:exit exit-code :reason reason-str} if should exit, nil otherwise."
+  [exit-mode tasks-state]
+  (let [running (filter :alive? (vals tasks-state))
+        exited (filter (comp not :alive?) (vals tasks-state))
+        failed (filter (fn [t] (and (not (:alive? t))
+                                    (not (:clean-exit? t))))
+                       exited)]
+    (case exit-mode
+      :keep-going nil
+      :fail-fast (when (seq failed)
+                   {:exit 1
+                    :reason (str "Tasks failed: " (->> failed (map :name) sort vec))})
+      :exit-on-any-completion (when (seq exited)
+                                {:exit (if (seq failed) 1 0)
+                                 :reason (str "Task completed: " (->> exited first :name))})
+      :exit-on-all-completion (when (empty? running)
+                                {:exit (if (seq failed) 1 0)
+                                 :reason "All tasks completed"})
+      nil)))
 
 (defrecord Watchdog [;; inputs
                      expected-count
@@ -13,47 +35,40 @@
                      stop-fn
                      ;; internal state
                      store
-                     watcher]
+                     watcher-thread
+                     running?]
   component/Lifecycle
   (start [this]
     (if (:store this)
       this
-      (let [store (atom {})]
-        (add-watch store ::process-watcher (fn [_k _ref _os state]
-                                             (let [running-tasks-count (count (filter :alive? (vals state)))
-                                                   unclean-exits (into {} (filter (fn [[_ {:keys [alive?]}]] alive?) state))]
-                                               (when (zero? running-tasks-count)
-                                                 (log/warn "Exiting. All tasks have exited. Exit stage left."
-                                                           {:level "WARN"})
-                                                 (remove-watch _ref ::process-watcher)
-                                                 (stop-fn {:exit 0}))
+      (let [store (atom {})
+            running? (atom true)
+            watcher (future
+                      (loop []
+                        (Thread/sleep 500)
+                        (when @running?
+                          (when-let [exit-info (should-exit? exit-mode @store)]
+                            (log/warn "Watchdog triggering exit" (assoc exit-info :event "WATCHDOG_EXIT"))
+                            (reset! running? false)
+                            (stop-fn exit-info))
+                          (recur))))]
 
-                                               (when (and (= exit-mode :fail-fast) ;; TODO: better name?
-                                                          (seq unclean-exits))
-                                                 (remove-watch _ref ::process-watcher)
-                                                 (log/with-context {:level "ERROR"}
-                                                   (log/infof "One or more tasks exited with an error %s"
-                                                              (->> unclean-exits keys sort vec)))
-
-                                                 (stop-fn {:exit 11})))))
-
-        (log/info "watchdog started" {:event "START" :task-count expected-count})
-        (assoc this :store store))))
+        (log/info "watchdog started" {:event "START" :task-count expected-count :exit-mode exit-mode})
+        (assoc this :store store :watcher-thread watcher :running? running?))))
 
   (stop [this]
-    (if (:store this)
-      (do
-        (remove-watch store ::process-watcher)
-        (log/info "bye" {:event "STOP"})
-
-        (assoc this :store nil))
-      this))
+    (when (:running? this)
+      (reset! running? false)
+      (when-let [w (:watcher-thread this)]
+        (future-cancel w))
+      (log/info "watchdog stopped" {:event "STOP"}))
+    (assoc this :store nil :watcher-thread nil :running? nil))
 
   IWatch
-  (mark-started [_this {:keys [name]}]
-    (swap! store assoc name {:alive? true}))
+  (mark-started [_this task-name]
+    (swap! store assoc task-name {:name task-name :alive? true}))
 
-  (mark-exited [_this {:keys [name clean?]}]
-    (swap! store assoc name {:alive? false :clean-exit? clean?})))
+  (mark-exited [_this task-name clean?]
+    (swap! store update task-name assoc :alive? false :clean-exit? clean?)))
 
 (defn create [a] (map->Watchdog a))
