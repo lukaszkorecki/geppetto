@@ -17,9 +17,9 @@ tasks:
   - name: web-server-ok
     command: ./test/process-simulator.clj -w 3001
 
-  # - name: web-server-unhealthy
-  #   command: ./test/process-simulator.clj -w 3002 -F
+  - name: web-server-unhealthy
+    command: ./test/process-simulator.clj -w 3002 -F
 
-  # - name: i-will-crash
-  #   command: ./process-simulator.clj --print-interval-ms=500 -e 12 -f 100
-  #   dir: ./test
+  - name: i-will-crash
+    command: ./process-simulator.clj --print-interval-ms=500 -e 12 -f 100
+    dir: ./test

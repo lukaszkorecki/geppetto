@@ -19,16 +19,18 @@
                                    dependencies (mapv keyword (seq depends_on))
                                    task (component/using
                                          task
-                                         (vec (concat [:watchdog] dependencies)))]
+                                         (vec (concat [ ] dependencies)))]
 
                                (hash-map (keyword name) task))))
                       (into {}))
 
-        task-sys (assoc task-sys :watchdog (watchdog/create {:exit-mode exit-mode
-                                                             :expected-count (count tasks)
-                                                             :stop-fn (fn [{:keys [exit]}]
-                                                                        (shutdown-agents)
-                                                                        (System/exit exit))}))]
+        task-sys (assoc task-sys :watchdog (component/using
+                                            (watchdog/create {:exit-mode exit-mode
+                                                              :stop-fn (fn [{:keys [exit]}]
+                                                                         (shutdown-agents)
+                                                                         (System/exit exit))})
+
+                                            (mapv keyword (keys task-sys))))]
 
     (component/map->SystemMap task-sys)))
 

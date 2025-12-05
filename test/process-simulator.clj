@@ -92,7 +92,7 @@
     (loop []
       (when print-output
         (log/infof "%s - %s - %s"
-                   (or (System/getenv "foo") "no-foo")
+                   (or (System/getenv "foo") "")
                    (rand-nth ["apple" "banana" "cherry" "date" "elderberry"])
                    (rand-int 10000))
         (flush))
