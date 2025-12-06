@@ -4,6 +4,7 @@ rm -rf classes geppetto
 mkdir -p classes
 clojure -M -e "(compile 'geppetto.core)"
 
+mkdir -p bin
 
 native-image \
     -cp "$(clojure -Spath):classes" \
@@ -50,3 +51,5 @@ native-image \
     --verbose \
     --no-fallback \
     geppetto.core
+
+mv ./geppetto ./bin/geppetto

@@ -6,15 +6,15 @@
 
 (def valid-modes
   #{::fail-fast
-    ::exit-on-any-completion
-    ::exit-on-all-completion
-    ::keep-going})
+    ::exit-on-any-completion ;; are this and fail-fast the same?
+    ::keep-going ;; rename to something short but clear
+    })
 
 (defn- should-exit?
   "Determines if geppetto should exit based on exit-mode and current task states.
   Returns {:exit exit-code :reason reason-str} if should exit, nil otherwise."
   [exit-mode tasks]
-  (log/with-context {:task "watchdog" :event "CHECK_EXIT_CONDITIONS"}
+  (log/with-context {:task "watchdog"}
     (let [running (filter task/alive? (vals tasks))
           exited (filter (comp not task/alive?) (vals tasks))
           failed (filter (fn [t] (and (not (task/alive? t))
@@ -23,23 +23,35 @@
 
       (log/debugf "Watchdog checking exit conditions: running=%d exited=%d failed=%d"
                   (count running) (count exited) (count failed))
-      (case exit-mode
-        ::keep-going nil
-        ::fail-fast (when (seq failed)
-                      (log/debug "Fail-fast triggered by failed tasks" {:event "EXITING"})
-                      {:exit 1
-                       :reason (str "Tasks failed: " (->> failed (map :name) sort vec))})
-        ::exit-on-any-completion (when (seq exited)
-                                   (log/debug "Exit-on-any-completion triggered by exited tasks" {:event "EXITING"})
-                                   {:exit (if (seq failed) 1 0)
-                                    :reason (str "Task completed: " (->> exited first :name))})
-        ::exit-on-all-completion (when (empty? running)
-                                   (log/debug "Exit-on-all-completion triggered - all tasks completed"
-                                              {:event "EXITING"})
-                                   {:exit (if (seq failed) 1 0)
-                                    :reason "All tasks completed"})
-        #_else ;; do nothing
-        nil))))
+
+      (->> (seq exited)
+           (mapv (fn [exited-task]
+                   (log/warnf "Task '%s' has exited with code %s"
+                              (:name exited-task)
+                              (task/exit-code exited-task)))))
+
+      (cond
+       (and (= exit-mode ::fail-fast) (seq failed))
+       (do
+         (log/debug "Fail-fast triggered by failed tasks" {:event "EXITING"})
+         {:exit 1
+          :reason (str "Tasks failed: " (->> failed (map :name) sort vec))})
+
+       (and (= exit-mode ::exit-on-any-completion) (seq exited))
+       (do
+         (log/debug "Exit-on-any-completion triggered by exited tasks" {:event "EXITING"})
+         {:exit (if (seq failed) 1 0)
+          :reason (str "Task completed: " (->> exited first :name))})
+
+       (empty? running)
+       (do
+         (log/debug "Exit-on-all-completion triggered - all tasks completed"
+                    {:event "EXITING"})
+         {:exit (if (seq failed) 1 0)
+          :reason "All tasks completed"})
+
+       :else
+       nil))))
 
 (defrecord Watchdog [;; inputs
                      exit-mode
@@ -61,8 +73,8 @@
                         (Thread/sleep 500)
                         (when @running?
                           (when-let [exit-info (should-exit? exit-mode tasks)]
-                            (log/with-context {:task "watchdog" :event "WATCHDOG_EXIT"}
-                              (log/warn "Watchdog triggering exit")
+                            (log/with-context {:task "watchdog"}
+                              (log/warn "Exiting")
                               (log/warnf "Reason: %s code=%s" (:reason exit-info) (:exit exit-info)))
                             (reset! running? false)
                             (stop-fn exit-info))

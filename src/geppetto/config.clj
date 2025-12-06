@@ -150,7 +150,8 @@
                             (mapv (fn [task]
                                     (-> task
                                         (resolve-task-dir {:config-file-dir config-file-dir})
-                                        (resolve-env {:config-file-dir config-file-dir})))))))))
+                                        (resolve-env {:config-file-dir config-file-dir})
+                                        (update :tags set)))))))))
 
 ;; FIXME: why do we need to do this?
 (def ordered-map-class

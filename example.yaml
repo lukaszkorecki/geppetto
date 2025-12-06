@@ -3,27 +3,54 @@ tasks:
   - name: simple-bin
     command: ./process-simulator.clj --print-interval-ms=500
     dir: ./test
+    tags:
+      - basic
+      - multi
 
   - name: simple-bin-with-a-very-long-name-for-some-reason
     command: ./process-simulator.clj --print-interval-ms=500
     dir: ./test
+    tags:
+      - log-test
+      - multi
 
   - name: simple-relative
     command: ./test/process-simulator.clj --print-interval-ms=500
     env:
       foo: woah.foo
 
+    tags:
+      - paths
+      - multi
+
   - name: very-relative
     command: ./geppetto/test/process-simulator.clj --print-interval-ms=500
     dir: ../
+    tags:
+      - paths
 
 
   - name: web-server-ok
     command: ./test/process-simulator.clj -w 3001
-
+    tag:
+      - http
+      - multi
+      - healthcheck
   - name: web-server-unhealthy
     command: ./test/process-simulator.clj -w 3002 -F
+    tags:
+      - http
+      - healthcheck
 
   - name: i-will-crash
     command: ./process-simulator.clj --print-interval-ms=500 -e 12 -f 100
     dir: ./test
+    tags:
+      - crashing
+
+
+  - name: i-crash-right-away
+    command: ./process-simulator.clj --print-interval-ms=500 -e 1 -f 10
+    dir: ./test
+    tags:
+      - crashing

@@ -15,7 +15,10 @@
 
 (def sys (atom nil))
 
-(defn- build-system [{:keys [tasks exit-mode tasks-to-launch tags]}]
+(defn- build-system [{:keys [tasks exit-mode tasks-to-launch tags] :as args}]
+  {:pre [(set? tasks-to-launch)
+         (set? tags)
+         (not-empty tasks)]}
   ;; verify that task filter mentions tasks that actually are defined in config
   (when (and (seq tasks-to-launch)
              (nil? (seq (set/intersection
@@ -25,7 +28,7 @@
     (System/exit 1))
   (let [task-sys (->> tasks
                       (filter (fn [{:keys [name]}]
-                                (or (nil? tasks-to-launch)
+                                (or (empty? tasks-to-launch)
                                     (some #(= name %) tasks-to-launch))))
                       (map (fn [{:keys [name depends_on] :as task-def}]
                              (let [task (task/create task-def)
@@ -33,7 +36,6 @@
                                    task (component/using
                                          task
                                          (vec (concat [] dependencies)))]
-
                                (hash-map (keyword name) task))))
                       (into {}))
 
@@ -61,7 +63,7 @@
           task-count (dec (count sys-map))]
 
       (when (zero? task-count)
-        (log/with-context {:event "FATAL"}
+        (log/with-context {:event "invalid options"}
           (log/error "No tasks to start. Exiting."))
         (System/exit 1))
 
@@ -78,8 +80,8 @@
 
       (log/with-context {:event "START"}
         (log/infof "Starting with config %s - %s tasks\n" config-file task-count))
-      (logger/init! {:debug? (or (not-empty (System/getenv "DEBUG")) debug)})
-      (reset! sys (component/start-system sys-map))
 
+      (future (reset! sys (component/start-system sys-map)))
+      (logger/init! {:debug? (or (not-empty (System/getenv "DEBUG")) debug)})
       (while true
         (Thread/sleep 1000)))))
