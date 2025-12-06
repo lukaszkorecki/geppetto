@@ -27,9 +27,22 @@
     (log/error "No matching tasks found to launch. Exiting.")
     (System/exit 1))
   (let [task-sys (->> tasks
-                      (filter (fn [{:keys [name]}]
-                                (or (empty? tasks-to-launch)
-                                    (some #(= name %) tasks-to-launch))))
+                      ;; first filter by tags
+                      (filter (fn [task]
+                                (or ;; untagged tasks always launch
+                                 (empty? (:tags task))
+                                 ;; when we have tag filters, check for intersection
+                                 (and (seq tags) (seq (set/intersection tags (:tags task)))))))
+
+                      ;; then filter by name
+                      (filter (fn [{:keys [name] :as _task}]
+                                (or
+                                 ;; no name filter means launch all
+                                 (empty? tasks-to-launch)
+
+                                  ;; otherwise only launch if in the set
+                                 (contains? tasks-to-launch name))))
+
                       (map (fn [{:keys [name depends_on] :as task-def}]
                              (let [task (task/create task-def)
                                    dependencies (mapv keyword (seq depends_on))

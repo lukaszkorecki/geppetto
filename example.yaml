@@ -29,7 +29,6 @@ tasks:
     tags:
       - paths
 
-
   - name: web-server-ok
     command: ./test/process-simulator.clj -w 3001
     tag:
@@ -48,9 +47,30 @@ tasks:
     tags:
       - crashing
 
-
   - name: i-crash-right-away
     command: ./process-simulator.clj --print-interval-ms=500 -e 1 -f 10
     dir: ./test
     tags:
       - crashing
+
+  - name: simple-bin-dep-1
+    command: ./process-simulator.clj --print-interval-ms=500
+    dir: ./test
+    depends_on:
+      - simple-bin-base
+    tags:
+      - deps
+
+  - name: simple-bin-dep-2
+    command: ./process-simulator.clj --print-interval-ms=500
+    dir: ./test
+    depends_on:
+      - simple-bin-base
+    tags:
+      - deps
+
+  - name: simple-bin-base
+    command: ./process-simulator.clj --print-interval-ms=500
+    dir: ./test
+    tags:
+      - deps
