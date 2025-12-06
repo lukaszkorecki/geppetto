@@ -49,9 +49,9 @@
     (component/map->SystemMap task-sys)))
 
 (defn -main [& args]
+  (logger/init! {:startup? true})
   (log/with-context {:task "geppetto"}
     (let [{:keys [config-file tasks-to-launch exit-mode debug print-tasks tags]} (cli/process-args (cli/parse-args args))
-          _ (logger/init! {:debug? (or (not-empty (System/getenv "DEBUG")) debug)})
           {:keys [tasks _settings] :as _conf} (config/load! config-file)
           sys-map (build-system {:tasks tasks
                                  :tasks-to-launch tasks-to-launch
@@ -78,6 +78,7 @@
 
       (log/with-context {:event "START"}
         (log/infof "Starting with config %s - %s tasks\n" config-file task-count))
+      (logger/init! {:debug? (or (not-empty (System/getenv "DEBUG")) debug)})
       (reset! sys (component/start-system sys-map))
 
       (while true

@@ -5,7 +5,17 @@
 
 (set! *warn-on-reflection* true)
 
-(def logger-config
+(def startup-sequence-logger
+  (lbc/data->xml-str
+   [:configuration
+    [:appender {:name "STDOUT", :class "ch.qos.logback.core.ConsoleAppender"}
+     [:withJansi true]
+     [:encoder
+      [:pattern "%highlight(%level) %X{event} %m%n"]]]
+    [:root {:level "INFO"}
+     [:appender-ref {:ref "STDOUT"}]]]))
+
+(def runtime-logger-config
   (lbc/data->xml-str
    [:configuration
     [:appender {:name "STDOUT", :class "ch.qos.logback.core.ConsoleAppender"}
@@ -25,11 +35,13 @@
     [:root {:level "DEBUG"}
      [:appender-ref {:ref "STDOUT"}]]]))
 
-(defn init! [{:keys [debug?]}]
+(defn init! [{:keys [startup? debug?]}]
+  (lb/configure! {:config (cond
+                           startup? startup-sequence-logger
+                           debug? debug-logger-config
+                           :else
+                           runtime-logger-config)})
 
-  (lb/configure! {:config (if debug?
-                            debug-logger-config
-                            logger-config)})
   ;; not necessary... technically
   (if debug?
     (lb/set-level! :debug)
