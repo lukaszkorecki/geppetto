@@ -3,10 +3,11 @@
    [babashka.process :as proc]
    [clojure.java.io :as io]
    [com.stuartsierra.component :as component]
-   [geppetto.logger :as logger]
    [mokujin.log :as log])
   (:import
    [java.io BufferedReader]))
+
+(set! *warn-on-reflection* true)
 
 (defprotocol ITask
   (status [this] "Get status of a task")
@@ -51,7 +52,8 @@
     (if (:process this)
       this
       (let [env (merge env {"geppetto.task-name" name})
-            {:keys [out err] :as process} (proc/process command {:extra-env env :dir dir})
+            {:keys [out err] :as process} (proc/process command {:extra-env env
+                                                                 :dir dir})
 
             stdout-thread (Thread.
                            (fn []
@@ -59,7 +61,7 @@
                                (loop []
                                  (when-let [line (BufferedReader/.readLine rdr)]
                                    #_{:clj-kondo/ignore [:mokujin.log/log-message-not-string]}
-                                   (log/info line {:task (logger/colorize name)})
+                                   (log/info line {:task name :dev "stdout"})
                                    (recur))))))
 
             stderr-thread (Thread.
@@ -68,7 +70,7 @@
                                (loop []
                                  (when-let [line (BufferedReader/.readLine rdr)]
                                    #_{:clj-kondo/ignore [:mokujin.log/error-log-map-args]}
-                                   (log/error line {:task (logger/colorize name) :dev "stderr"})
+                                   (log/error line {:task name :dev "stderr"})
                                    (recur))))))]
 
         (.start stdout-thread)
@@ -80,12 +82,15 @@
                :err-thread stderr-thread))))
 
   (stop [this]
+    (log/warn "Stopping" {:task name})
     (when-let [process (:process this)]
       (when (proc/alive? process)
         (proc/destroy-tree process))
 
-      (when-let [t (:out-thread this)] (.interrupt t))
-      (when-let [t (:err-thread this)] (.interrupt t))
+      (proc/check process)
+
+      (when-let [t (:out-thread this)] (Thread/.interrupt t))
+      (when-let [t (:err-thread this)] (Thread/.interrupt t))
 
       (assoc this
              :process nil

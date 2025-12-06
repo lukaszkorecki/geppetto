@@ -5,34 +5,56 @@
 
 (set! *warn-on-reflection* true)
 
-(lb/configure! {:config (lbc/data->xml-str
-                         [:configuration
-                          [:appender {:name "PLAIN_TEXT", :class "ch.qos.logback.core.ConsoleAppender"}
-                           [:withJansi true]
-                           [:encoder
-                            [:pattern "%mdc %msg%n"]]]
+(def logger-config
+  (lbc/data->xml-str
+   [:configuration
+    [:appender {:name "STDOUT", :class "ch.qos.logback.core.ConsoleAppender"}
+     [:withJansi true]
+     [:encoder
+      [:pattern "%-24.-24X{task}| %X{event} %m%n"]]]
+    [:root {:level "INFO"}
+     [:appender-ref {:ref "STDOUT"}]]]))
 
-                          [:root {:level "INFO"}
-                           [:appender-ref {:ref "PLAIN_TEXT"}]]])})
+(def debug-logger-config
+  (lbc/data->xml-str
+   [:configuration
+    [:appender {:name "STDOUT", :class "ch.qos.logback.core.ConsoleAppender"}
+     [:withJansi true]
+     [:encoder
+      [:pattern "%p{%level %logger} %mdc log=%m%n"]]]
+    [:root {:level "DEBUG"}
+     [:appender-ref {:ref "STDOUT"}]]]))
 
+(defn init! [{:keys [debug?]}]
+
+  (lb/configure! {:config (if debug?
+                            debug-logger-config
+                            logger-config)})
+  ;; not necessary... technically
+  (if debug?
+    (lb/set-level! :debug)
+    (lb/set-level! :info)))
+
+;; XXX: disabled for now!
+(comment
 ;; Task output logging
-(def color-codes
-  {0 31 ; red
-   1 32 ; green
-   2 33 ; yellow
-   3 34 ; blue
-   4 35 ; magenta
-   5 36 ; cyan
-   })
+  (def color-codes
+    {0 31 ; red
+     1 32 ; green
+     2 33 ; yellow
+     3 34 ; blue
+     4 35 ; magenta
+     5 36 ; cyan
+     })
 
-(def no-color?
-  (delay (boolean (System/getenv "NO_COLOR"))))
+  (def no-color?
+    (delay (boolean (System/getenv "NO_COLOR"))))
 
-(defn colorize
-  "Calculate hash and return ANSI color code string for task name"
-  [name]
-  (if @no-color?
-    name
-    (let [hash-code (mod (reduce + (map int name)) 6)
-          color-code (get color-codes hash-code 37)]
-      (str "\u001b[" color-code "m" name "\u001b[0m"))))
+  (defn colorize
+    "Calculate hash and return ANSI color code string for task name"
+    [name]
+    (if @no-color?
+      name
+      (let [hash-code (mod (reduce + (map int name)) 6)
+            color-code (get color-codes hash-code 37)]
+        (str "\u001b[" color-code "m" name "\u001b[0m")))))

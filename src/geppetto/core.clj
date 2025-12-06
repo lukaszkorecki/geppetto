@@ -1,26 +1,38 @@
 (ns geppetto.core
   (:gen-class)
   (:require
+   [clojure.set :as set]
+   [clojure.string :as str]
    [com.stuartsierra.component :as component]
-   [geppetto.config :as config]
-   geppetto.logger
    [geppetto.cli :as cli]
-   [mokujin.log :as log]
+   [geppetto.config :as config]
+   [geppetto.logger :as logger]
+   [geppetto.task :as task]
    [geppetto.watchdog :as watchdog]
-   [geppetto.task :as task]))
+   [mokujin.log :as log]))
 
 (set! *warn-on-reflection* true)
 
 (def sys (atom nil))
 
-(defn- build-system [tasks exit-mode]
+(defn- build-system [{:keys [tasks exit-mode tasks-to-launch tags]}]
+  ;; verify that task filter mentions tasks that actually are defined in config
+  (when (and (seq tasks-to-launch)
+             (nil? (seq (set/intersection
+                         (set tasks-to-launch)
+                         (set (map :name tasks))))))
+    (log/error "No matching tasks found to launch. Exiting.")
+    (System/exit 1))
   (let [task-sys (->> tasks
+                      (filter (fn [{:keys [name]}]
+                                (or (nil? tasks-to-launch)
+                                    (some #(= name %) tasks-to-launch))))
                       (map (fn [{:keys [name depends_on] :as task-def}]
                              (let [task (task/create task-def)
                                    dependencies (mapv keyword (seq depends_on))
                                    task (component/using
                                          task
-                                         (vec (concat [ ] dependencies)))]
+                                         (vec (concat [] dependencies)))]
 
                                (hash-map (keyword name) task))))
                       (into {}))
@@ -28,6 +40,7 @@
         task-sys (assoc task-sys :watchdog (component/using
                                             (watchdog/create {:exit-mode exit-mode
                                                               :stop-fn (fn [{:keys [exit]}]
+                                                                         (Thread/sleep 300) ;; allow logs to flush
                                                                          (shutdown-agents)
                                                                          (System/exit exit))})
 
@@ -36,16 +49,36 @@
     (component/map->SystemMap task-sys)))
 
 (defn -main [& args]
-  (let [config-file (str (first args))
-        {:keys [tasks _settings] :as _conf} (config/load! config-file)
-        ;; TODO: Parse from CLI flags once implemented
-        ;; Options: :keep-going, :fail-fast, :exit-on-any-completion, :exit-on-all-completion
-        exit-mode :fail-fast
-        sys-map (build-system tasks exit-mode)]
+  (log/with-context {:task "geppetto"}
+    (let [{:keys [config-file tasks-to-launch exit-mode debug print-tasks tags]} (cli/process-args (cli/parse-args args))
+          _ (logger/init! {:debug? (or (not-empty (System/getenv "DEBUG")) debug)})
+          {:keys [tasks _settings] :as _conf} (config/load! config-file)
+          sys-map (build-system {:tasks tasks
+                                 :tasks-to-launch tasks-to-launch
+                                 :tags tags
+                                 :exit-mode exit-mode})
+          ;; we 'dec' because watchdog is also part of the system map
+          task-count (dec (count sys-map))]
 
-    (log/with-context {:event "START"}
-      (log/infof "Starting geppetto with config %s - %s tasks\n" config-file (dec (count sys-map))))
-    (reset! sys (component/start-system sys-map))
+      (when (zero? task-count)
+        (log/with-context {:event "FATAL"}
+          (log/error "No tasks to start. Exiting."))
+        (System/exit 1))
 
-    (while true
-      (Thread/sleep 1000))))
+      (when print-tasks
+        (println "Defined tasks")
+        (->> (keys sys-map)
+             (remove #(= :watchdog %))
+             (mapv #(str "- " (name %)))
+             sort
+             (str/join "\n")
+             println)
+
+        (System/exit 0))
+
+      (log/with-context {:event "START"}
+        (log/infof "Starting with config %s - %s tasks\n" config-file task-count))
+      (reset! sys (component/start-system sys-map))
+
+      (while true
+        (Thread/sleep 1000)))))

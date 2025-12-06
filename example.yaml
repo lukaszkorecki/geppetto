@@ -4,6 +4,10 @@ tasks:
     command: ./process-simulator.clj --print-interval-ms=500
     dir: ./test
 
+  - name: simple-bin-with-a-very-long-name-for-some-reason
+    command: ./process-simulator.clj --print-interval-ms=500
+    dir: ./test
+
   - name: simple-relative
     command: ./test/process-simulator.clj --print-interval-ms=500
     env:

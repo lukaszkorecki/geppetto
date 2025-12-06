@@ -79,7 +79,7 @@
 (defn verify! [conf]
   (when-not (m/validate TaskConfig conf)
     (errors/raise! ::errors/invalid-config (fn []
-                                             (log/with-context {:level "ERROR"}
+                                             (log/with-context {:task "config-parser"}
                                                (log/error "invalid config!"))
                                              (-> (m/explain TaskConfig conf)
                                                  me/humanize
@@ -100,8 +100,8 @@
     ;; we have a dir, it's absolute, but it doesn't exist
    (and (not-empty dir) (fs/absolute? dir) (not (fs/exists? dir)))
    (errors/raise! ::errors/task-dir-doesnt-exist
-                  #(log/errorf "ERROR: task '%s' specifies a working directory that doesn't exist: %s"
-                     (:name task) dir))
+                  #(log/errorf "FATAL: task '%s' specifies a working directory that doesn't exist: %s"
+                               (:name task) dir))
 
     ;; we have a dir, it's relative - resolve it
    (and (not-empty dir) (not (fs/absolute? dir)))
@@ -111,8 +111,8 @@
      (if (fs/exists? final-path)
        (assoc task :dir (str final-path))
        (errors/raise! ::errors/task-dir-doesnt-exist
-                      #(log/errorf "task '%s' specifies a working directory that doesn't exist: %s"
-                                   (:name task) final-path))))))
+                      #(log/errorf "FATAL: task '%s' specifies a working directory that doesn't exist: %s"
+                         (:name task) final-path))))))
 
 (defn parse-env-file [env-file-path]
   (->> (env-file-path)
@@ -133,7 +133,7 @@
       (if (fs/exists? resolved-path)
         (update task :env merge (parse-env-file resolved-path))
         (errors/raise! ::errors/task-env-file-doesnt-exist
-                       #(log/errorf "task '%s' has an env_file that doesn't exist: %s"
+                       #(log/errorf "FATAL: task '%s' has an env_file that doesn't exist: %s"
                                     (:name task) resolved-path))))
 
     task))
