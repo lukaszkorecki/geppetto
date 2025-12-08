@@ -44,8 +44,9 @@
     (= ::alive (:status (status this))))
 
   (exit-code [this]
-    (when-let [process (:process this)]
-      (:exit @process)))
+    (when-not (alive? this)
+      (when-let [process (:process this)]
+        (:exit @process))))
 
   component/Lifecycle
   (start [this]

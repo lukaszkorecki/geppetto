@@ -10,6 +10,8 @@
     ::keep-going ;; rename to something short but clear
     })
 
+(def recently-exited (atom []))
+
 (defn- should-exit?
   "Determines if geppetto should exit based on exit-mode and current task states.
   Returns {:exit exit-code :reason reason-str} if should exit, nil otherwise."
@@ -24,11 +26,16 @@
       (log/debugf "Watchdog checking exit conditions: running=%d exited=%d failed=%d"
                   (count running) (count exited) (count failed))
 
+      ;; print out newly exited tasks, but only once
       (->> (seq exited)
+           (remove (fn [exited-task]
+                     (some #(= (:name exited-task) (:name %)) @recently-exited)))
            (mapv (fn [exited-task]
-                   (log/warnf "Task '%s' has exited with code %s"
-                              (:name exited-task)
-                              (task/exit-code exited-task)))))
+                   (let [exit-code (task/exit-code exited-task)]
+                     (log/with-context {:task (:name exited-task)}
+                       (log/warnf "Task has exited with code %s" exit-code))
+                     (swap! recently-exited conj {:name (:name exited-task)
+                                                  :exit-code exit-code})))))
 
       (cond
        (and (= exit-mode ::fail-fast) (seq failed))
@@ -45,8 +52,7 @@
 
        (empty? running)
        (do
-         (log/debug "Exit-on-all-completion triggered - all tasks completed"
-                    {:event "EXITING"})
+         (log/debug "Exit-on-all-completion triggered - all tasks completed" {:event "EXITING"})
          {:exit (if (seq failed) 1 0)
           :reason "All tasks completed"})
 
