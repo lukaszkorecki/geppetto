@@ -52,6 +52,8 @@
     (if (:process this)
       this
       (let [env (merge env {"geppetto.task-name" name})
+            _ (log/with-context {:task name}
+                (log/infof "starting in %s with env %s" dir (pr-str (sort (keys env)))))
             {:keys [out err] :as process} (proc/process command {:extra-env env
                                                                  :dir dir})
 
@@ -60,8 +62,9 @@
                              (with-open [rdr (io/reader out)]
                                (loop []
                                  (when-let [line (BufferedReader/.readLine rdr)]
-                                   #_{:clj-kondo/ignore [:mokujin.log/log-message-not-string]}
-                                   (log/info line {:task name :dev "stdout"})
+                                   (log/with-context {:task name :dev "stdout"}
+                                     #_{:clj-kondo/ignore [:mokujin.log/log-message-not-string]}
+                                     (log/info line))
                                    (recur))))))
 
             stderr-thread (Thread.
@@ -69,12 +72,12 @@
                              (with-open [rdr (io/reader err)]
                                (loop []
                                  (when-let [line (BufferedReader/.readLine rdr)]
-                                   #_{:clj-kondo/ignore [:mokujin.log/error-log-map-args]}
-                                   (log/error line {:task name :dev "stderr"})
+                                   (log/with-context {:task name :dev "stderr"}
+                                     (log/error line))
                                    (recur))))))]
 
-        (.start stdout-thread)
-        (.start stderr-thread)
+        (Thread/.start stdout-thread)
+        (Thread/.start stderr-thread)
 
         (assoc this
                :process process
