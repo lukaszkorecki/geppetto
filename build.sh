@@ -8,6 +8,7 @@ mkdir -p bin
 
 native-image \
     -cp "$(clojure -Spath):classes" \
+    -march=native \
     -H:Name=geppetto \
     -H:+ReportExceptionStackTraces \
     -H:+UnlockExperimentalVMOptions \

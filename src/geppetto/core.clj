@@ -28,20 +28,20 @@
     (System/exit 1))
   (let [task-sys (->> tasks
                       ;; first filter by tags
-                      (filter (fn [task]
-                                (or ;; untagged tasks always launch
-                                 (empty? (:tags task))
+                      #_(filter (fn [task]
+                                  (or ;; untagged tasks always launch
+                                   (empty? (:tags task))
                                  ;; when we have tag filters, check for intersection
-                                 (and (seq tags) (seq (set/intersection tags (:tags task)))))))
+                                   (and (seq tags) (seq (set/intersection tags (:tags task)))))))
 
                       ;; then filter by name
-                      (filter (fn [{:keys [name] :as _task}]
-                                (or
+                      #_(filter (fn [{:keys [name] :as _task}]
+                                  (or
                                  ;; no name filter means launch all
-                                 (empty? tasks-to-launch)
+                                   (empty? tasks-to-launch)
 
                                   ;; otherwise only launch if in the set
-                                 (contains? tasks-to-launch name))))
+                                   (contains? tasks-to-launch name))))
 
                       (map (fn [{:keys [name depends_on] :as task-def}]
                              (let [task (task/create task-def)
@@ -91,10 +91,10 @@
 
         (System/exit 0))
 
-      (log/with-context {:event "START"}
+      (log/with-context {:event "START" :task "geppetto"}
         (log/infof "Starting with config %s - %s tasks\n" config-file task-count))
 
-      (future (reset! sys (component/start-system sys-map)))
       (logger/init! {:debug? (or (not-empty (System/getenv "DEBUG")) debug)})
+      (reset! sys (component/start-system sys-map))
       (while true
         (Thread/sleep 1000)))))

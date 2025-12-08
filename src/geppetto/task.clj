@@ -53,7 +53,7 @@
       this
       (let [env (merge env {"geppetto.task-name" name})
             _ (log/with-context {:task name}
-                (log/infof "starting in %s with env %s" dir (pr-str (sort (keys env)))))
+                (log/infof "starting %s in %s " command dir))
             {:keys [out err] :as process} (proc/process command {:extra-env env
                                                                  :dir dir})
 
