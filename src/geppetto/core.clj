@@ -78,8 +78,7 @@
 ;; pre-bake logger init to capture any early logs + set up the logging system during compile time
 (logger/init! {:debug? (not-empty (System/getenv "DEBUG"))})
 
-(defn -main [& args]
-  (logger/init! {:debug? (not-empty (System/getenv "DEBUG"))})
+(defn run-geppetto [args]
   (log/with-context {:task "geppetto"}
     (let [{:keys [config-file tasks-to-launch exit-mode debug print-tasks tags]} (cli/process-args (cli/parse-args args))
           {:keys [tasks _settings] :as _conf} (config/load! config-file)
@@ -91,13 +90,12 @@
                                  :tasks-to-launch tasks-to-launch
                                  :tags tags
                                  :exit-mode exit-mode})
-          ;; we 'dec' because watchdog is also part of the system map
-          task-count (dec (count sys-map))]
+          task-count (count (dissoc sys-map :watchdog))]
 
       (when (zero? task-count)
         (log/with-context {:event "invalid options"}
           (log/error "No tasks to start. Exiting."))
-        (System/exit 1))
+        (cli/exit 1 ""))
 
       (when print-tasks
         (println "Defined tasks")
@@ -108,12 +106,16 @@
              (str/join "\n")
              println)
 
-        (System/exit 0))
+        (cli/exit 0 ""))
 
       (log/with-context {:event "START" :task "geppetto"}
         (log/infof "Starting with config %s - %s tasks\n" config-file task-count))
 
       (logger/init! {:debug? (or (not-empty (System/getenv "DEBUG")) debug)})
-      (reset! sys (component/start-system sys-map))
-      (while true
-        (Thread/sleep 1000)))))
+      (reset! sys (component/start-system sys-map)))))
+
+(defn -main [& args]
+  (logger/init! {:debug? (not-empty (System/getenv "DEBUG"))})
+  (run-geppetto (vec args))
+  (while true
+    (Thread/sleep 1000)))

@@ -37,7 +37,7 @@
   (let [{:keys [pre-hook exit-code]} (ex-data exc)]
     (when (fn? pre-hook)
       (pre-hook))
-    (if [exit-code (and (number? exit-code) (pos? exit-code))]
+    (if (and (number? exit-code) (pos? exit-code))
       ;; fatal error - exit the JVM, unless suppressed
       (if *really-exit?*
         (do

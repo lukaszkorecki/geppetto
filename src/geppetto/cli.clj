@@ -78,19 +78,23 @@
      :else
      (assoc options :config-file (first arguments)))))
 
+(defn exit [code message]
+  (println message)
+  (System/exit code))
+
 (defn process-args [{:keys [exit-code message config-file] :as opts}]
   (when (number? exit-code)
-    (println message)
-    (System/exit exit-code))
+    (exit exit-code message))
+  (if (number? exit-code)
+    opts
+    (let [config-file (cond
+                       (str/starts-with? config-file "./")
+                       config-file
 
-  (let [config-file (cond
-                     (str/starts-with? config-file "./")
-                     config-file
+                       (str/starts-with? config-file "/")
+                       config-file
 
-                     (str/starts-with? config-file "/")
-                     config-file
-
-                     :else
-                     ;; assume config-file path is relative to cwd
-                     (str "./" config-file))]
-    (assoc opts :config-file config-file)))
+                       :else
+                       ;; assume config-file path is relative to cwd
+                       (str "./" config-file))]
+      (assoc opts :config-file config-file))))

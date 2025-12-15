@@ -1,8 +1,14 @@
 (ns geppetto.config-test
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [clojure.test :refer [deftest is testing use-fixtures]]
             [geppetto.config :as config]
             [geppetto.errors :as errors]
             [babashka.fs :as fs]))
+
+(defn suppress-exit-fixture [f]
+  (binding [errors/*really-exit?* false]
+    (f)))
+
+(use-fixtures :each suppress-exit-fixture)
 
 (deftest verify-test
   (testing "with a valid config"
@@ -10,9 +16,8 @@
       (is (= valid-config (config/verify! valid-config)))))
 
   (testing "with an invalid config"
-    (binding [errors/*really-exit?* false]
-      (let [invalid-config {:tasks [{:name "task-1"}]}]
-        (is (thrown? clojure.lang.ExceptionInfo (config/verify! invalid-config)))))))
+    (let [invalid-config {:tasks [{:name "task-1"}]}]
+      (is (thrown? clojure.lang.ExceptionInfo (config/verify! invalid-config))))))
 
 (deftest resolve-task-dir-test
   (let [temp-dir (fs/create-temp-dir {:prefix "geppetto-test"})
@@ -26,9 +31,8 @@
         (is (= task (#'config/resolve-task-dir task {:config-file-dir config-file-dir})))))
 
     (testing "when :dir is absolute and does not exist"
-      (binding [errors/*really-exit?* false]
-        (let [task {:name "task-1" :command "command-1" :dir "/non-existent-dir"}]
-          (is (thrown? clojure.lang.ExceptionInfo (#'config/resolve-task-dir task {:config-file-dir config-file-dir}))))))
+      (let [task {:name "task-1" :command "command-1" :dir "/non-existent-dir"}]
+        (is (thrown? clojure.lang.ExceptionInfo (#'config/resolve-task-dir task {:config-file-dir config-file-dir})))))
 
     (testing "when :dir is relative and resolves correctly"
       (let [task {:name "task-1" :command "command-1" :dir "subdir"}
@@ -37,9 +41,8 @@
         (is (= (str (fs/absolutize (fs/path config-file-dir "subdir"))) (:dir resolved-task)))))
 
     (testing "when :dir is relative and does not resolve"
-      (binding [errors/*really-exit?* false]
-        (let [task {:name "task-1" :command "command-1" :dir "non-existent-subdir"}]
-          (is (thrown? clojure.lang.ExceptionInfo (#'config/resolve-task-dir task {:config-file-dir config-file-dir}))))))))
+      (let [task {:name "task-1" :command "command-1" :dir "non-existent-subdir"}]
+        (is (thrown? clojure.lang.ExceptionInfo (#'config/resolve-task-dir task {:config-file-dir config-file-dir})))))))
 
 (deftest parse-env-file-test
   (testing "parses a .env file correctly"
@@ -66,9 +69,8 @@
         (is (= expected-env (:env resolved-task)))))
 
     (testing "when env_file does not exist"
-      (binding [errors/*really-exit?* false]
-        (let [task {:name "task-1" :command "command-1" :env_file "non-existent.env"}]
-          (is (thrown? clojure.lang.ExceptionInfo (config/resolve-env task {:config-file-dir config-file-dir}))))))))
+      (let [task {:name "task-1" :command "command-1" :env_file "non-existent.env"}]
+        (is (thrown? clojure.lang.ExceptionInfo (config/resolve-env task {:config-file-dir config-file-dir})))))))
 
 (deftest load-test
   (testing "with a valid config"
@@ -78,13 +80,10 @@
       (is (= (set ["a" "b"]) (-> config :tasks second :tags)))))
 
   (testing "with a non-existent config"
-    (binding [errors/*really-exit?* false]
-      (is (thrown? clojure.lang.ExceptionInfo (config/load! "test/fixtures/non-existent.yaml")))))
+    (is (thrown? clojure.lang.ExceptionInfo (config/load! "test/fixtures/non-existent.yaml"))))
 
   (testing "with an invalid yaml config"
-    (binding [errors/*really-exit?* false]
-      (is (thrown? Exception (config/load! "test/fixtures/invalid_yaml.yaml")))))
+    (is (thrown? Exception (config/load! "test/fixtures/invalid_yaml.yaml"))))
 
   (testing "with an invalid config"
-    (binding [errors/*really-exit?* false]
-      (is (thrown? clojure.lang.ExceptionInfo (config/load! "test/fixtures/invalid_config.yaml"))))))
+    (is (thrown? clojure.lang.ExceptionInfo (config/load! "test/fixtures/invalid_config.yaml")))))

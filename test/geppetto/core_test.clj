@@ -1,7 +1,11 @@
 (ns geppetto.core-test
   (:require [clojure.test :refer [deftest is testing]]
             [geppetto.core :as core]
-            [geppetto.errors :as errors]))
+            [geppetto.errors :as errors]
+            [geppetto.config :as config]
+            [geppetto.cli :as cli]
+            [com.stuartsierra.component :as component]
+            [geppetto.task :as task]))
 
 (def tasks
   [{:name "task-1" :command "command-1" :tags #{"tag-a"}}
@@ -34,3 +38,25 @@
   (testing "filter by non-existent tag"
     (let [sys (#'core/build-system {:tasks tasks :tasks-to-launch #{} :tags #{"non-existent"}})]
       (is (= #{:task-4 :watchdog} (set (keys sys)))))))
+
+(deftest run-geppetto-test
+  (testing "with --print-tasks option"
+    (let [exit-info (atom nil)
+          printed-output (atom nil)]
+      (with-redefs [config/load! (fn [_] {:tasks tasks})
+                    cli/exit (fn [code _] (reset! exit-info code))
+                    println (fn [s] (reset! printed-output s))
+                    component/start-system (fn [sys] sys)
+                    task/create (fn [t] t)]
+        (core/run-geppetto ["--print-tasks" "config.yaml"])
+        (is (= 0 @exit-info))
+        (is (clojure.string/includes? @printed-output "- task-1")))))
+
+  (testing "when no tasks are found"
+    (let [exit-info (atom nil)]
+      (with-redefs [config/load! (fn [_] {:tasks []})
+                    cli/exit (fn [code _] (reset! exit-info code))
+                    component/start-system (fn [sys] sys)
+                    task/create (fn [t] t)]
+        (core/run-geppetto ["config.yaml"])
+        (is (= 1 @exit-info))))))

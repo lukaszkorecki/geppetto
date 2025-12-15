@@ -92,8 +92,6 @@
       (when (proc/alive? process)
         (proc/destroy-tree process))
 
-      (proc/check process)
-
       (when-let [t (:out-thread this)] (Thread/.interrupt t))
       (when-let [t (:err-thread this)] (Thread/.interrupt t))
 
