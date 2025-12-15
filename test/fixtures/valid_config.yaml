@@ -1,0 +1,7 @@
+tasks:
+  - name: task-1
+    command: "ls -la"
+    dir: "."
+  - name: task-2
+    command: "echo 'hello'"
+    tags: ["a", "b"]

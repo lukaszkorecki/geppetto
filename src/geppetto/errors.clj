@@ -10,7 +10,8 @@
    ::invalid-config {:message "Configuration file is invalid." :exit-code 2}
    ::task-dir-doesnt-exist {:message "Task working directory does not exist." :exit-code 3}
    ::task-env-file-doesnt-exist {:message "Task environment file does not exist." :exit-code 3}
-   ::invalid-task-dependency {:message "Task has an invalid dependency." :exit-code 4}})
+   ::invalid-task-dependency {:message "Task has an invalid dependency." :exit-code 4}
+   ::no-matching-tasks {:message "No matching tasks found to launch." :exit-code 5}})
 
 (def ^{:dynamic true
        :doc "Set this to false to prevent errors from exiting the JVM. Only used in tests."}

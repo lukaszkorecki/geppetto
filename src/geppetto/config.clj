@@ -114,8 +114,7 @@
                         #(log/errorf "FATAL: task specifies a working directory that doesn't exist: %s" final-path)))))))
 
 (defn parse-env-file [env-file-path]
-  (->> (env-file-path)
-       slurp
+  (->> (slurp env-file-path)
        str/split-lines
        (map str/trim)
        (remove #(or (str/blank? %) (str/starts-with? % "#")))

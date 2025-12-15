@@ -6,6 +6,7 @@
    [com.stuartsierra.component :as component]
    [geppetto.cli :as cli]
    [geppetto.config :as config]
+   [geppetto.errors :as errors]
    [geppetto.logger :as logger]
    [geppetto.task :as task]
    [geppetto.watchdog :as watchdog]
@@ -17,57 +18,60 @@
 (defn- build-system [{:keys [tasks exit-mode tasks-to-launch tags] :as _args}]
   {:pre [(set? tasks-to-launch)
          (set? tags)
-         (not-empty tasks)]}
-  ;; verify that task filter mentions tasks that actually are defined in config
-  (when (and (seq tasks-to-launch)
-             (nil? (seq (set/intersection
-                         (set tasks-to-launch)
-                         (set (map :name tasks))))))
-    (log/error "No matching tasks found to launch. Exiting.")
-    (System/exit 1))
-  (let [longest-name-char-count (apply max (map #(count (:name %)) tasks))
-        task-sys (->> tasks
-                      ;; first filter by tags
-                      #_(filter (fn [task]
-                                  (or ;; untagged tasks always launch
-                                   (empty? (:tags task))
-                                   ;; when we have tag filters, check for intersection
-                                   (and (seq tags) (seq (set/intersection tags (:tags task)))))))
+         (vector? tasks)]}
+  (if (empty? tasks)
+    {}
+    (do
+      ;; verify that task filter mentions tasks that actually are defined in config
+      (when (and (seq tasks-to-launch)
+                 (empty? (set/intersection
+                          (set tasks-to-launch)
+                          (set (map :name tasks)))))
+        (errors/raise! ::errors/no-matching-tasks))
+      (let [longest-name-char-count (apply max (map #(count (:name %)) tasks))
+            task-sys (->> tasks
+                          ;; first filter by tags
+                          (filter (fn [task]
+                                    (if (empty? tags)
+                                      true
+                                      (or
+                                       (empty? (:tags task))
+                                       (seq (set/intersection tags (:tags task)))))))
 
-                      ;; then filter by name
-                      (filter (fn [{:keys [name] :as _task}]
-                                (or
-                                 ;; no name filter means launch all
-                                 (empty? tasks-to-launch)
+                          ;; then filter by name
+                          (filter (fn [{:keys [name] :as _task}]
+                                    (or
+                                     ;; no name filter means launch all
+                                     (empty? tasks-to-launch)
 
-                                 ;; otherwise only launch if in the set
-                                 (contains? tasks-to-launch name))))
+                                     ;; otherwise only launch if in the set
+                                     (contains? tasks-to-launch name))))
 
-                      (map (fn [{:keys [name depends_on] :as task-def}]
-                             (let [;; loggable name padded to longest task name for prettier logs
-                                   loggable-name (str (logger/colorize name)
-                                                     (apply str (repeat
-                                                                 (- longest-name-char-count
-                                                                    (count name))
-                                                                 " ")))
-                                   task (task/create (assoc task-def :loggable-name loggable-name))
-                                   dependencies (mapv keyword (seq depends_on))
-                                   task (component/using
-                                         task
-                                         (vec (concat [] dependencies)))]
-                               (hash-map (keyword name) task))))
-                      (into {}))
+                          (map (fn [{:keys [name depends_on] :as task-def}]
+                                 (let [;; loggable name padded to longest task name for prettier logs
+                                       loggable-name (str (logger/colorize name)
+                                                          (apply str (repeat
+                                                                      (- longest-name-char-count
+                                                                         (count name))
+                                                                      " ")))
+                                       task (task/create (assoc task-def :loggable-name loggable-name))
+                                       dependencies (mapv keyword (seq depends_on))
+                                       task (component/using
+                                             task
+                                             (vec (concat [] dependencies)))]
+                                   (hash-map (keyword name) task))))
+                          (into {}))
 
-        task-sys (assoc task-sys :watchdog (component/using
-                                            (watchdog/create {:exit-mode exit-mode
-                                                              :stop-fn (fn [{:keys [exit]}]
-                                                                         (Thread/sleep 300) ;; allow logs to flush
-                                                                         (shutdown-agents)
-                                                                         (System/exit exit))})
+            task-sys (assoc task-sys :watchdog (component/using
+                                                (watchdog/create {:exit-mode exit-mode
+                                                                  :stop-fn (fn [{:keys [exit]}]
+                                                                             (Thread/sleep 300) ;; allow logs to flush
+                                                                             (shutdown-agents)
+                                                                             (System/exit exit))})
 
-                                            (mapv keyword (keys task-sys))))]
+                                                (mapv keyword (keys task-sys))))]
 
-    (component/map->SystemMap task-sys)))
+        (component/map->SystemMap task-sys)))))
 
 (def sys (atom nil))
 

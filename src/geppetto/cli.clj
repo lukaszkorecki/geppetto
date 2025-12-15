@@ -45,14 +45,14 @@
      (:help options)
      {:exit-code 0
       :message (str/join \newline
-                         ["Geppetto - A simple task runner"
-                          (str "Version: " version)
-                          ""
-                          "Usage: geppetto [options] <config-file>"
-                          ""
-                          "Options:"
-                          summary
-                          ""])}
+                 ["Geppetto - A simple task runner"
+                  (str "Version: " version)
+                  ""
+                  "Usage: geppetto [options] <config-file>"
+                  ""
+                  "Options:"
+                  summary
+                  ""])}
 
      (:print-version options)
      {:exit-code 0
@@ -61,19 +61,19 @@
      (seq errors)
      {:exit-code 1
       :message (str/join \newline
-                         (concat
-                          ["Error parsing command line options:"]
-                          errors
-                          ["" "Usage:" summary]))}
+                 (concat
+                  ["Error parsing command line options:"]
+                  errors
+                  ["" "Usage:" summary]))}
 
       ;; TODO: support multiple config files
      (not= 1 (count arguments))
      {:exit-code 1
       :message (str/join \newline
-                         ["Error: exactly one config file must be specified"
-                          ""
-                          "Usage:"
-                          summary])}
+                 ["Error: exactly one config file must be specified"
+                  ""
+                  "Usage:"
+                  summary])}
 
      :else
      (assoc options :config-file (first arguments)))))

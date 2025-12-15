@@ -13,4 +13,7 @@
         }
 
  :aliases {:start {:main-opts ["-m" "geppetto.core"]
-                   :jvm-opts ["-Dclojure.main.report=stderr"]}}}
+                   :jvm-opts ["-Dclojure.main.report=stderr"]}
+           :test {:extra-paths ["test"]
+                  :extra-deps {lambdaisland/kaocha {:mvn/version "1.91.1392"}}
+                  :main-opts ["-m" "kaocha.runner"]}}}
