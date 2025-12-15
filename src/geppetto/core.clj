@@ -13,9 +13,8 @@
 
 (set! *warn-on-reflection* true)
 
-(def sys (atom nil))
-
-(defn- build-system [{:keys [tasks exit-mode tasks-to-launch tags] :as args}]
+;; TODO: move to separate ns
+(defn- build-system [{:keys [tasks exit-mode tasks-to-launch tags] :as _args}]
   {:pre [(set? tasks-to-launch)
          (set? tags)
          (not-empty tasks)]}
@@ -26,7 +25,8 @@
                          (set (map :name tasks))))))
     (log/error "No matching tasks found to launch. Exiting.")
     (System/exit 1))
-  (let [task-sys (->> tasks
+  (let [longest-name-char-count (apply max (map #(count (:name %)) tasks))
+        task-sys (->> tasks
                       ;; first filter by tags
                       #_(filter (fn [task]
                                   (or ;; untagged tasks always launch
@@ -44,7 +44,13 @@
                                  (contains? tasks-to-launch name))))
 
                       (map (fn [{:keys [name depends_on] :as task-def}]
-                             (let [task (task/create task-def)
+                             (let [;; loggable name padded to longest task name for prettier logs
+                                   loggable-name (str (logger/colorize name)
+                                                     (apply str (repeat
+                                                                 (- longest-name-char-count
+                                                                    (count name))
+                                                                 " ")))
+                                   task (task/create (assoc task-def :loggable-name loggable-name))
                                    dependencies (mapv keyword (seq depends_on))
                                    task (component/using
                                          task
@@ -63,11 +69,20 @@
 
     (component/map->SystemMap task-sys)))
 
+(def sys (atom nil))
+
+;; pre-bake logger init to capture any early logs + set up the logging system during compile time
+(logger/init! {:debug? (not-empty (System/getenv "DEBUG"))})
+
 (defn -main [& args]
-  (logger/init! {:startup? true})
+  (logger/init! {:debug? (not-empty (System/getenv "DEBUG"))})
   (log/with-context {:task "geppetto"}
     (let [{:keys [config-file tasks-to-launch exit-mode debug print-tasks tags]} (cli/process-args (cli/parse-args args))
           {:keys [tasks _settings] :as _conf} (config/load! config-file)
+          ;; FIXME: we can improve all of this much better:
+          ;; - merge CLI and config file data into one settings map and pass that around
+          ;; - move to multimethods for hadnling different CLI options (print tasks, validate config, etc)
+          ;; - move `build-system` to separate ns
           sys-map (build-system {:tasks tasks
                                  :tasks-to-launch tasks-to-launch
                                  :tags tags

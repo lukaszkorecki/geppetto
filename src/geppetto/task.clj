@@ -16,6 +16,7 @@
 
 (defrecord ATask [command
                   name
+                  loggable-name
                   tags
                   env
                   dir
@@ -53,7 +54,7 @@
     (if (:process this)
       this
       (let [env (merge env {"geppetto.task-name" name})
-            _ (log/with-context {:task name}
+            _ (log/with-context {:task (or loggable-name name)}
                 (log/infof "starting %s in %s " command dir))
             {:keys [out err] :as process} (proc/process command {:extra-env env
                                                                  :dir dir})
@@ -63,7 +64,7 @@
                              (with-open [rdr (io/reader out)]
                                (loop []
                                  (when-let [line (BufferedReader/.readLine rdr)]
-                                   (log/with-context {:task name :dev "stdout"}
+                                   (log/with-context {:task (or loggable-name name) :dev "stdout"}
                                      #_{:clj-kondo/ignore [:mokujin.log/log-message-not-string]}
                                      (log/info line))
                                    (recur))))))
@@ -73,7 +74,7 @@
                              (with-open [rdr (io/reader err)]
                                (loop []
                                  (when-let [line (BufferedReader/.readLine rdr)]
-                                   (log/with-context {:task name :dev "stderr"}
+                                   (log/with-context {:task (or loggable-name name) :dev "stderr"}
                                      (log/error line))
                                    (recur))))))]
 
@@ -86,7 +87,7 @@
                :err-thread stderr-thread))))
 
   (stop [this]
-    (log/warn "Stopping" {:task name})
+    (log/warn "Stopping" {:task loggable-name})
     (when-let [process (:process this)]
       (when (proc/alive? process)
         (proc/destroy-tree process))

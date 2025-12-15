@@ -62,13 +62,8 @@
    [:settings
     {:optional true :description "Global settings for the task runner"}
     [:map
-     [:output_format
-      {:description "Output format for task runner logs"
-       :optional true}
-      [:enum "text" "json"]]
-
-     [:default_workdir
-      {:description "Default working directory for tasks with relative paths"
+     [:root_dir
+      {:description "Default working directory for tasks with relative paths. When not specified, the config file location is used"
        :optional true
        :min 1}
       :string]]]
@@ -139,7 +134,6 @@
         (errors/raise! ::errors/task-env-file-doesnt-exist
                        #(log/errorf "FATAL: task '%s' has an env_file that doesn't exist: %s"
                                     (:name task) resolved-path))))
-
     task))
 
 (defn resolve
