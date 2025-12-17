@@ -7,6 +7,7 @@
    [geppetto.cli :as cli]
    [geppetto.config :as config]
    [geppetto.errors :as errors]
+   [geppetto.exit :as exit]
    [geppetto.logger :as logger]
    [geppetto.task :as task]
    [geppetto.watchdog :as watchdog]
@@ -67,7 +68,7 @@
                                                                   :stop-fn (fn [{:keys [exit]}]
                                                                              (Thread/sleep 300) ;; allow logs to flush
                                                                              (shutdown-agents)
-                                                                             (System/exit exit))})
+                                                                             (exit/exit! exit))})
 
                                                 (mapv keyword (keys task-sys))))]
 

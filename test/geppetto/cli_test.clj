@@ -1,7 +1,10 @@
 (ns geppetto.cli-test
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [clojure.test :refer [deftest is testing use-fixtures]]
             [geppetto.cli :as cli]
-            [geppetto.watchdog :as watchdog]))
+            [geppetto.watchdog :as watchdog]
+            [geppetto.test-helper :as helper]))
+
+(use-fixtures :each helper/exit-suppressing-fixture)
 
 (deftest parse-args-test
   (testing "with --help option"
@@ -48,7 +51,11 @@
       (is (= "./config.yaml" (:config-file result)))))
 
   (testing "calls System/exit on exit-code"
-    (let [exit-info (atom nil)]
-      (with-redefs [cli/exit (fn [code message] (reset! exit-info {:code code :message message}))]
-        (cli/process-args {:exit-code 1 :message "error"})
-        (is (= {:code 1 :message "error"} @exit-info))))))
+    (helper/assert-exits-with-code 1
+                                   (cli/process-args {:exit-code 1 :message "error"})))
+
+  (testing "does not exit when no exit code"
+    (let [opts {:config-file "config.yaml"}
+          result (cli/process-args opts)]
+      (is (= "./config.yaml" (:config-file result))))))
+

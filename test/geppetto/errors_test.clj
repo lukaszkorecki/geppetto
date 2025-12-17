@@ -1,6 +1,9 @@
 (ns geppetto.errors-test
-  (:require [clojure.test :refer [deftest is testing]]
-            [geppetto.errors :as errors]))
+  (:require [clojure.test :refer [deftest is testing use-fixtures]]
+            [geppetto.errors :as errors]
+            [geppetto.test-helper :as helper]))
+
+(use-fixtures :each helper/exit-suppressing-fixture)
 
 (deftest type->exc-test
   (testing "with unknown type"
@@ -14,6 +17,5 @@
 
 (deftest raise-test
   (testing "with pre-existing exception"
-    (binding [errors/*really-exit?* false]
-      (let [exc (ex-info "test" {:type ::errors/invalid-config :exit-code 2})]
-        (is (thrown? clojure.lang.ExceptionInfo (errors/raise! exc)))))))
+    (let [exc (ex-info "test" {:type ::errors/invalid-config :exit-code 2})]
+      (helper/assert-exits-with-code 2 (errors/raise! exc)))))

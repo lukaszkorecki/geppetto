@@ -2,7 +2,8 @@
   (:require
    [clojure.string :as str]
    [clojure.tools.cli :as cli]
-   [geppetto.watchdog :as watchdog]))
+   [geppetto.watchdog :as watchdog]
+   [geppetto.exit :as exit]))
 
 (def version "0.0.1")
 
@@ -80,7 +81,7 @@
 
 (defn exit [code message]
   (println message)
-  (System/exit code))
+  (exit/exit! code))
 
 (defn process-args [{:keys [exit-code message config-file] :as opts}]
   (when (number? exit-code)

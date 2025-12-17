@@ -2,13 +2,10 @@
   (:require [clojure.test :refer [deftest is testing use-fixtures]]
             [geppetto.config :as config]
             [geppetto.errors :as errors]
-            [babashka.fs :as fs]))
+            [babashka.fs :as fs]
+            [geppetto.test-helper :as helper]))
 
-(defn suppress-exit-fixture [f]
-  (binding [errors/*really-exit?* false]
-    (f)))
-
-(use-fixtures :each suppress-exit-fixture)
+(use-fixtures :each helper/exit-suppressing-fixture)
 
 (deftest verify-test
   (testing "with a valid config"

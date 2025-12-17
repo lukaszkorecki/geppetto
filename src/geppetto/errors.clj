@@ -1,7 +1,8 @@
 (ns geppetto.errors
   "Convinence around building and raising typed errors."
   (:require
-   [mokujin.log :as log]))
+   [mokujin.log :as log]
+   [geppetto.exit :as exit]))
 
 (def registry
   {::unknown {:message "An unknown error occurred."}
@@ -12,10 +13,6 @@
    ::task-env-file-doesnt-exist {:message "Task environment file does not exist." :exit-code 3}
    ::invalid-task-dependency {:message "Task has an invalid dependency." :exit-code 4}
    ::no-matching-tasks {:message "No matching tasks found to launch." :exit-code 5}})
-
-(def ^{:dynamic true
-       :doc "Set this to false to prevent errors from exiting the JVM. Only used in tests."}
-  *really-exit?* true)
 
 (defn type->exc
   ([type]
@@ -39,18 +36,13 @@
       (pre-hook))
     (if (and (number? exit-code) (pos? exit-code))
       ;; fatal error - exit the JVM, unless suppressed
-      (if *really-exit?*
-        (do
-          (flush)
-          (binding [*out* *err*]
-            (flush))
-          (log/with-context {:level "FATAL"}
-            (if-let [err-type (-> exc ex-data ::type)]
-              (log/errorf "[%s] %s\n" err-type (ex-message exc))
-              (log/errorf "%s\n" (ex-message exc))))
-          (System/exit exit-code))
-        ;; suppressed fatal error exit - used in tests
-        (throw (ex-info "suppressed fatal error" (ex-data exc) exc)))
+      (do
+        (flush)
+        (log/with-context {:level "FATAL"}
+          (if-let [err-type (-> exc ex-data ::type)]
+            (log/errorf "[%s] %s\n" err-type (ex-message exc))
+            (log/errorf "%s\n" (ex-message exc))))
+        (exit/exit! exit-code))
       ;; non-fatal error - just re-throw
       (throw exc))))
 
