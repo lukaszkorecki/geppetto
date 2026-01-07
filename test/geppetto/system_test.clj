@@ -13,9 +13,9 @@
    {:name "task-4" :command "command-4"}]) ;; no tags = always runs (like Compose)
 
 (deftest simple-test
-  (testing "no filters - should return all tasks"
+  (testing "no filters - should return only untagged tasks (Docker Compose behavior)"
     (let [sys (system/build {:tasks tasks :tasks-to-launch #{} :tags #{}})]
-      (is (= #{:task-1 :task-2 :task-3 :task-4 :watchdog} (set (keys sys)))))))
+      (is (= #{:task-4 :watchdog} (set (keys sys)))))))
 
 (deftest filtering-by-name-test
 
