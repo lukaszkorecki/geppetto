@@ -136,11 +136,11 @@
 
     ;; Handle help and errors
     (cond
-     (:help options)
-     (exit 0 (usage summary))
+      (:help options)
+      (exit 0 (usage summary))
 
-     errors
-     (exit 1 (error-msg errors)))
+      errors
+      (exit 1 (error-msg errors)))
 
     (let [start-time (System/currentTimeMillis)]
       ;; Decide mode based on options

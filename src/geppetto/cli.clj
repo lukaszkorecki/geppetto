@@ -43,41 +43,41 @@
 (defn parse-args [cmd-args]
   (let [{:keys [summary errors options arguments] :as _res} (cli/parse-opts cmd-args cli-options)]
     (cond
-     (:help options)
-     {:exit-code 0
-      :message (str/join \newline
-                 ["Geppetto - A simple task runner"
-                  (str "Version: " version)
-                  ""
-                  "Usage: geppetto [options] <config-file>"
-                  ""
-                  "Options:"
-                  summary
-                  ""])}
+      (:help options)
+      {:exit-code 0
+       :message (str/join \newline
+                          ["Geppetto - A simple task runner"
+                           (str "Version: " version)
+                           ""
+                           "Usage: geppetto [options] <config-file>"
+                           ""
+                           "Options:"
+                           summary
+                           ""])}
 
-     (:print-version options)
-     {:exit-code 0
-      :message (str "Geppetto version " version)}
+      (:print-version options)
+      {:exit-code 0
+       :message (str "Geppetto version " version)}
 
-     (seq errors)
-     {:exit-code 1
-      :message (str/join \newline
-                 (concat
-                  ["Error parsing command line options:"]
-                  errors
-                  ["" "Usage:" summary]))}
+      (seq errors)
+      {:exit-code 1
+       :message (str/join \newline
+                          (concat
+                           ["Error parsing command line options:"]
+                           errors
+                           ["" "Usage:" summary]))}
 
       ;; TODO: support multiple config files
-     (not= 1 (count arguments))
-     {:exit-code 1
-      :message (str/join \newline
-                 ["Error: exactly one config file must be specified"
-                  ""
-                  "Usage:"
-                  summary])}
+      (not= 1 (count arguments))
+      {:exit-code 1
+       :message (str/join \newline
+                          ["Error: exactly one config file must be specified"
+                           ""
+                           "Usage:"
+                           summary])}
 
-     :else
-     (assoc options :config-file (first arguments)))))
+      :else
+      (assoc options :config-file (first arguments)))))
 
 (defn exit [code message]
   (println message)
@@ -89,13 +89,13 @@
   (if (number? exit-code)
     opts
     (let [config-file (cond
-                       (str/starts-with? config-file "./")
-                       config-file
+                        (str/starts-with? config-file "./")
+                        config-file
 
-                       (str/starts-with? config-file "/")
-                       config-file
+                        (str/starts-with? config-file "/")
+                        config-file
 
-                       :else
+                        :else
                        ;; assume config-file path is relative to cwd
-                       (str "./" config-file))]
+                        (str "./" config-file))]
       (assoc opts :config-file config-file))))

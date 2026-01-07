@@ -97,7 +97,6 @@
       (println (str "- " (name task-name)))
       (when-let [task-tags (seq (:tags (get system task-name)))]
         (println (str "    Tags: " (str/join ", " (sort task-tags))))))
-
     (exit/exit! 0)))
 
 (defmethod cli-dispatch :start [{:keys [system context] :as _args}]

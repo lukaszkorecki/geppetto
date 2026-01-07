@@ -87,31 +87,31 @@
 
     (cond
     ;; bail out - nothing to do
-     (not dir)
-     task
+      (not dir)
+      task
 
     ;; bail out - nothing to do
-     (and (not-empty dir) (fs/absolute? dir) (fs/exists? dir))
-     (do
-       (log/debugf "Task '%s' has an absolute working directory that exists: %s"
-         (:name task) dir)
-       task)
+      (and (not-empty dir) (fs/absolute? dir) (fs/exists? dir))
+      (do
+        (log/debugf "Task '%s' has an absolute working directory that exists: %s"
+                    (:name task) dir)
+        task)
 
     ;; we have a dir, it's absolute, but it doesn't exist
-     (and (not-empty dir) (fs/absolute? dir) (not (fs/exists? dir)))
-     (errors/raise! ::errors/task-dir-doesnt-exist
-                    #(log/errorf "FATAL: task specifies a working directory that doesn't exist: %s" dir))
+      (and (not-empty dir) (fs/absolute? dir) (not (fs/exists? dir)))
+      (errors/raise! ::errors/task-dir-doesnt-exist
+                     #(log/errorf "FATAL: task specifies a working directory that doesn't exist: %s" dir))
 
     ;; we have a dir, it's relative - resolve it
-     (and (not-empty dir) (not (fs/absolute? dir)))
-     (let [final-path (-> (str config-file-dir "/" dir)
-                          fs/absolutize
-                          fs/normalize)]
-       (log/debugf "Task has a relative working directory; resolved to: %s" final-path)
-       (if (fs/exists? final-path)
-         (assoc task :dir (str final-path))
-         (errors/raise! ::errors/task-dir-doesnt-exist
-                        #(log/errorf "FATAL: task specifies a working directory that doesn't exist: %s" final-path)))))))
+      (and (not-empty dir) (not (fs/absolute? dir)))
+      (let [final-path (-> (str config-file-dir "/" dir)
+                           fs/absolutize
+                           fs/normalize)]
+        (log/debugf "Task has a relative working directory; resolved to: %s" final-path)
+        (if (fs/exists? final-path)
+          (assoc task :dir (str final-path))
+          (errors/raise! ::errors/task-dir-doesnt-exist
+                         #(log/errorf "FATAL: task specifies a working directory that doesn't exist: %s" final-path)))))))
 
 (defn parse-env-file [env-file-path]
   (->> (slurp env-file-path)

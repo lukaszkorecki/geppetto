@@ -38,26 +38,26 @@
                                                   :exit-code exit-code})))))
 
       (cond
-       (and (= exit-mode ::fail-fast) (seq failed))
-       (do
-         (log/debug "Fail-fast triggered by failed tasks" {:event "EXITING"})
-         {:exit 1
-          :reason (str "Tasks failed: " (->> failed (map :name) sort vec))})
+        (and (= exit-mode ::fail-fast) (seq failed))
+        (do
+          (log/debug "Fail-fast triggered by failed tasks" {:event "EXITING"})
+          {:exit 1
+           :reason (str "Tasks failed: " (->> failed (map :name) sort vec))})
 
-       (and (= exit-mode ::exit-on-any-completion) (seq exited))
-       (do
-         (log/debug "Exit-on-any-completion triggered by exited tasks" {:event "EXITING"})
-         {:exit (if (seq failed) 1 0)
-          :reason (str "Task completed: " (->> exited first :name))})
+        (and (= exit-mode ::exit-on-any-completion) (seq exited))
+        (do
+          (log/debug "Exit-on-any-completion triggered by exited tasks" {:event "EXITING"})
+          {:exit (if (seq failed) 1 0)
+           :reason (str "Task completed: " (->> exited first :name))})
 
-       (empty? running)
-       (do
-         (log/debug "Exit-on-all-completion triggered - all tasks completed" {:event "EXITING"})
-         {:exit (if (seq failed) 1 0)
-          :reason "All tasks completed"})
+        (empty? running)
+        (do
+          (log/debug "Exit-on-all-completion triggered - all tasks completed" {:event "EXITING"})
+          {:exit (if (seq failed) 1 0)
+           :reason "All tasks completed"})
 
-       :else
-       nil))))
+        :else
+        nil))))
 
 (defrecord Watchdog [;; inputs
                      exit-mode

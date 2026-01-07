@@ -12,7 +12,8 @@
    ::task-dir-doesnt-exist {:message "Task working directory does not exist." :exit-code 3}
    ::task-env-file-doesnt-exist {:message "Task environment file does not exist." :exit-code 3}
    ::invalid-task-dependency {:message "Task has an invalid dependency." :exit-code 4}
-   ::no-matching-tasks {:message "No matching tasks found to launch." :exit-code 5}})
+   ::no-matching-tasks {:message "No matching tasks found to launch." :exit-code 5}
+   ::no-tasks-in-config {:message "No tasks defined in configuration." :exit-code 6}})
 
 (defn type->exc
   ([type]
@@ -23,7 +24,7 @@
               (cond-> {:type (or type ::unknown)
                        :exit-code exit-code}
 
-                      pre-hook (assoc :pre-hook pre-hook))))))
+                pre-hook (assoc :pre-hook pre-hook))))))
 
 (defn throw-or-exit
   "Throws given internal exception or exits the JVM if it's a fatal error.
@@ -38,7 +39,7 @@
       ;; fatal error - exit the JVM, unless suppressed
       (do
         (flush)
-        (log/with-context {:level "FATAL"}
+        (log/with-context {:level "FATAL" :task "geppetto"}
           (if-let [err-type (-> exc ex-data ::type)]
             (log/errorf "[%s] %s\n" err-type (ex-message exc))
             (log/errorf "%s\n" (ex-message exc))))
@@ -54,5 +55,5 @@
   ([thing pre-hook]
    (if (instance? Throwable thing)
      (throw-or-exit thing)
-    ;; assume internal type
+     ;; assume internal type
      (-> thing (type->exc pre-hook) throw-or-exit))))

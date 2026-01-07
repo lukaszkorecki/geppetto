@@ -13,7 +13,7 @@
          (set? tags)
          (vector? tasks)]}
   (if (empty? tasks)
-    {}
+    (errors/raise! ::errors/no-tasks-in-config)
     (do
       ;; verify that task filter mentions tasks that actually are defined in config
       (when (and (seq tasks-to-launch)
