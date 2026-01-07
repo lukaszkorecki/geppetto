@@ -1,9 +1,9 @@
 (ns geppetto.core-test
   (:require [clojure.test :refer [deftest is testing use-fixtures]]
+            [clojure.string :as str]
             [geppetto.core :as core]
-            [geppetto.errors :as errors]
+            geppetto.errors
             [geppetto.config :as config]
-            [geppetto.cli :as cli]
             [com.stuartsierra.component :as component]
             [geppetto.task :as task]
             [geppetto.test-helper :as helper]))
@@ -49,7 +49,7 @@
       (let [s (with-out-str
                 (is (thrown? clojure.lang.ExceptionInfo
                              (core/run-geppetto ["--print-tasks" "config.yaml"]))))]
-        (is (clojure.string/includes? s "- task-1")))))
+        (is (str/includes? s "- task-1")))))
 
   (testing "when no tasks are found"
     (with-redefs [config/load! (fn [_] {:tasks []})
