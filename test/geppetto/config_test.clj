@@ -1,7 +1,6 @@
 (ns geppetto.config-test
   (:require [clojure.test :refer [deftest is testing use-fixtures]]
             [geppetto.config :as config]
-            [geppetto.errors :as errors]
             [babashka.fs :as fs]
             [geppetto.test-helper :as helper]))
 
