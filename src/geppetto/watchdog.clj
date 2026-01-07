@@ -5,10 +5,9 @@
    [mokujin.log :as log]))
 
 (def valid-modes
-  #{::fail-fast
-    ::exit-on-any-completion ;; are this and fail-fast the same?
-    ::keep-going ;; rename to something short but clear
-    })
+  {::on-failure "exit immediately when ANY task fails (non-zero exit)"
+   ::any        "exit when ANY task completes (successful or failed)"
+   ::all        "wait for ALL tasks to complete"})
 
 (def recently-exited (atom []))
 
@@ -38,21 +37,21 @@
                                                   :exit-code exit-code})))))
 
       (cond
-        (and (= exit-mode ::fail-fast) (seq failed))
+        (and (= exit-mode ::on-failure) (seq failed))
         (do
-          (log/debug "Fail-fast triggered by failed tasks" {:event "EXITING"})
+          (log/debug "on-failure mode: exiting due to failed tasks" {:event "EXITING"})
           {:exit 1
            :reason (str "Tasks failed: " (->> failed (map :name) sort vec))})
 
-        (and (= exit-mode ::exit-on-any-completion) (seq exited))
+        (and (= exit-mode ::any) (seq exited))
         (do
-          (log/debug "Exit-on-any-completion triggered by exited tasks" {:event "EXITING"})
+          (log/debug "any mode: exiting due to task completion" {:event "EXITING"})
           {:exit (if (seq failed) 1 0)
            :reason (str "Task completed: " (->> exited first :name))})
 
         (empty? running)
         (do
-          (log/debug "Exit-on-all-completion triggered - all tasks completed" {:event "EXITING"})
+          (log/debug "all mode: all tasks completed" {:event "EXITING"})
           {:exit (if (seq failed) 1 0)
            :reason "All tasks completed"})
 

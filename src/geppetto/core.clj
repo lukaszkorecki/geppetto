@@ -22,18 +22,20 @@
 
 (def version "0.0.1")
 
-(def ^:private default-mode ::watchdog/fail-fast)
+(def ^:private default-mode ::watchdog/all)
 
 (def cli-options
   [["-e" "--exit-mode EXIT_MODE"
-    (format "How to behave when one of tasks exits: %s"
-            (str/join ", " (sort (map name watchdog/valid-modes))))
+    (str "Exit behavior when tasks complete or fail:\n"
+         (str/join "\n" (map (fn [[mode desc]]
+                               (str "                                 - " (name mode) ": " desc))
+                             (sort-by (comp name first) watchdog/valid-modes))))
     :id :exit-mode
     :default default-mode
     :default-desc (name default-mode)
     :parse-fn #(keyword (namespace default-mode) %)
-    :validate [watchdog/valid-modes
-               (str "Must be one of: " (str/join ", " (map name watchdog/valid-modes)))]]
+    :validate [(set (keys watchdog/valid-modes))
+               (str "Must be one of: " (str/join ", " (map name (keys watchdog/valid-modes))))]]
 
    ["-t" "--tasks TASKS" "Comma separated list of tasks to run (default: all tasks in config)"
     :id :tasks-to-launch

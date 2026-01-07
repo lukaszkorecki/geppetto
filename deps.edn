@@ -16,4 +16,10 @@
            :test {:extra-paths ["test"]
                   :extra-deps {lambdaisland/kaocha {:mvn/version "1.91.1392"}
                                lambdaisland/kaocha-cloverage {:mvn/version "1.1.89"}}
-                  :main-opts ["-m" "kaocha.runner"]}}}
+                  :main-opts ["-m" "kaocha.runner"]}
+
+           :check {:extra-deps {athos/clj-check {:git/url "https://github.com/athos/clj-check.git"
+                                                 :sha "d997df866b2a04b7ce7b17533093ee0a2e2cb729"}}
+                   :main-opts ["-m" "clj-check.check"
+                               "src"]
+                   :jvm-opts ["-Dclojure.main.report=stderr"]}}}
