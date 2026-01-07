@@ -30,13 +30,13 @@ tasks:
       - paths
 
   - name: web-server-ok
-    command: ./test/process-simulator.clj -w 3001
+    command: ./test/process-simulator.clj --web-server-port 30001
     tag:
       - http
       - multi
       - healthcheck
   - name: web-server-unhealthy
-    command: ./test/process-simulator.clj -w 3002 -F
+    command: ./test/process-simulator.clj --web-server-port 30002 --fail-health-check
     tags:
       - http
       - healthcheck

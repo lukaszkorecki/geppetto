@@ -25,7 +25,9 @@
 (def ^:private default-mode ::watchdog/fail-fast)
 
 (def cli-options
-  [["-e" "--exit-mode EXIT_MODE" "How to behave when one of tasks exits: fail-fast, exit-on-any-completion, exit-on-all-completion, keep-going"
+  [["-e" "--exit-mode EXIT_MODE"
+    (format "How to behave when one of tasks exits: %s"
+            (str/join ", " (sort (map name watchdog/valid-modes))))
     :id :exit-mode
     :default default-mode
     :default-desc (name default-mode)
@@ -86,9 +88,19 @@
                  :summary summary
                  :errors errors}))
 
-(defmethod cli-dispatch :print-tasks [{:keys [system _context] :as _args}]
+(defmethod cli-dispatch :print-tasks [{:keys [system context] :as _args}]
   (log/with-context {:task "geppetto"}
     (log/info "Tasks defined in config:")
+    (when (or (seq (:tasks-to-launch context))
+              (seq (:tags context)))
+      (log/infof "Active filters: %s %s"
+                 (if (empty? (:tasks-to-launch context))
+                   "none"
+                   (str "tasks=" (str/join ", " (sort (:tasks-to-launch context)))))
+                 (if (empty? (:tags context))
+                   "none"
+                   (str "tags=" (str/join ", " (sort (:tags context)))))))
+
     (doseq [task-name (->> system
                            keys
                            (remove #{:watchdog})
@@ -137,6 +149,9 @@
 
                     {:keys [print-tasks tags exit-mode tasks-to-launch]} options
                     {:keys [tasks _settings] :as _conf} (config/load! config-file-path)
+
+                    _ (when (empty? tasks)
+                        (errors/raise! ::errors/no-tasks-in-config))
 
                     context {:tasks tasks
                              :config-file config-file-path

@@ -3,7 +3,8 @@
 (require '[clojure.tools.cli :refer [parse-opts]]
          '[org.httpkit.server :as http]
          '[cheshire.core :as json]
-         '[clojure.tools.logging :as log])
+         '[clojure.tools.logging :as log]
+         '[clojure.string :as str])
 
 (def cli-options
   [["-e" "--exit-with EXIT_CODE" "Exit with specified exit code (default: 0)"
@@ -49,11 +50,11 @@
         ""
         "  # Simulate process printing output only, no web server"
         "  process-simulator.clj --print-output --print-interval-ms 100"]
-       (clojure.string/join \newline)))
+       (str/join \newline)))
 
 (defn error-msg [errors]
   (str "The following errors occurred while parsing your command:\n\n"
-       (clojure.string/join \newline errors)))
+       (str/join \newline errors)))
 
 (defn exit [status msg]
   (log/info msg)
