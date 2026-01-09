@@ -50,12 +50,11 @@
 
 (deftest watchdog-lifecycle-test
   (testing "starting and stopping the watchdog"
-    (let [stop-fn-was-called (atom false)
-          watchdog (watchdog/create {:exit-mode ::watchdog/all
-                                     :stop-fn (fn [_] (reset! stop-fn-was-called true))})
+    (let [watchdog (watchdog/create {:exit-mode ::watchdog/all})
           started-watchdog (component/start watchdog)]
       (is (:watcher-thread started-watchdog))
       (is (:running? started-watchdog))
+      (is (:shutdown-promise started-watchdog))
       (let [stopped-watchdog (component/stop started-watchdog)]
         (is (nil? (:watcher-thread stopped-watchdog)))
         (is (nil? (:running? stopped-watchdog)))))))

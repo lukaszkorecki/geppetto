@@ -6,10 +6,13 @@
 
 (def valid-modes
   {::on-failure "exit immediately when ANY task fails (non-zero exit)"
-   ::any        "exit when ANY task completes (successful or failed)"
-   ::all        "wait for ALL tasks to complete"})
+   ::any "exit when ANY task completes (successful or failed)"
+   ::all "wait for ALL tasks to complete"})
 
 (def recently-exited (atom []))
+
+(defprotocol IWatchdog
+  (wait-for-exit [this] "Blocks until watchdog signals exit. Returns exit info map with :exit and :reason."))
 
 (defn- should-exit?
   "Determines if geppetto should exit based on exit-mode and current task states.
@@ -60,18 +63,19 @@
 
 (defrecord Watchdog [;; inputs
                      exit-mode
-                     stop-fn
                      ;; internal state
                      store
                      watcher-thread
-                     running?]
+                     running?
+                     shutdown-promise]
   component/Lifecycle
   (start [this]
     (if (:store this)
       this
       (let [store (atom {})
             running? (atom true)
-            tasks (dissoc this :exit-mode :stop-fn :store :watcher-thread :running?)
+            shutdown-promise (promise)
+            tasks (dissoc this :exit-mode :store :watcher-thread :running? :shutdown-promise)
             task-count (count tasks)
             watcher (future
                       (loop []
@@ -81,14 +85,13 @@
                             (log/with-context {:task "watchdog"}
                               (log/warn "Exiting")
                               (log/warnf "Reason: %s code=%s" (:reason exit-info) (:exit exit-info)))
-                            (reset! running? false)
-                            (stop-fn exit-info))
+                            (deliver shutdown-promise exit-info))
                           (recur))))]
 
         #_{:clj-kondo/ignore [:mokujin.log/log-message-not-string]}
         (log/info (format "started %s tasks exit-mode=%s" task-count (name exit-mode))
                   {:task "watchdog" :event "START"})
-        (assoc this :store store :watcher-thread watcher :running? running?))))
+        (assoc this :store store :watcher-thread watcher :running? running? :shutdown-promise shutdown-promise))))
 
   (stop [this]
     (when (:running? this)
@@ -96,6 +99,10 @@
       (when-let [w (:watcher-thread this)]
         (future-cancel w))
       (log/info "stopped" {:task "watchdog" :event "STOP"}))
-    (assoc this :store nil :watcher-thread nil :running? nil)))
+    (assoc this :store nil :watcher-thread nil :running? nil))
+
+  IWatchdog
+  (wait-for-exit [this]
+    @(:shutdown-promise this)))
 
 (defn create [a] (map->Watchdog a))

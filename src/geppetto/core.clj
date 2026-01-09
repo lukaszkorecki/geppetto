@@ -14,8 +14,6 @@
 
 (set! *warn-on-reflection* true)
 
-(def sys (atom nil))
-
 ;; pre-bake logger init to capture any early logs + set up the logging system during compile time
 ;; NOTE: DEBUG flag only has effect in JVM version, since native-image compilation will inline the value of the env var and disable debug logging if not set during build time!
 (logger/init! {:debug? (not-empty (System/getenv "DEBUG"))})
@@ -115,12 +113,32 @@
 
 (defmethod cli-dispatch :start [{:keys [system context] :as _args}]
   (log/with-context {:task "geppetto"}
-    (let [task-count (dec (count system))]
+    (let [task-count (dec (count system))] ;; subtract watchdog
 
       (log/with-context {:event "START" :task "geppetto"}
         (log/infof "Starting with config %s - %s tasks\n" (:config-file context) task-count))
 
-      (reset! sys (component/start-system system)))))
+      ;; Start the system
+      (let [started-system (component/start-system system)
+            ;; Extract the watchdog and wait for it to signal exit
+            wd (:watchdog started-system)
+            {:keys [exit reason] :as _exit-info} (watchdog/wait-for-exit wd)]
+
+        (log/with-context {:task "geppetto"}
+          (log/infof "Shutdown requested: %s" reason))
+
+        ;; Graceful shutdown: stop all components
+        (log/with-context {:task "geppetto"}
+          (log/info "Stopping system components..."))
+
+        (component/stop-system started-system)
+
+        ;; Allow logs to flush
+        (Thread/sleep 300)
+        (shutdown-agents)
+
+        ;; Exit with the code from the shutdown signal
+        (exit/exit! exit)))))
 
 ;; Handle command line arguments and return a map with action and relevant data
 (defn handle-args [cmd-args]
@@ -177,9 +195,5 @@
                :errors ["No config file specified."]}))))
 
 (defn -main [& args]
-
   (let [something' (handle-args (vec args))]
-    (cli-dispatch something'))
-
-  (while true
-    (Thread/sleep 1000)))
+    (cli-dispatch something')))

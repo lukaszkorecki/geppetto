@@ -3,7 +3,6 @@
    [clojure.set :as set]
    [com.stuartsierra.component :as component]
    [geppetto.errors :as errors]
-   [geppetto.exit :as exit]
    [geppetto.logger :as logger]
    [geppetto.task :as task]
    [geppetto.watchdog :as watchdog]))
@@ -41,6 +40,8 @@
 
           longest-name-char-count (when (seq final-tasks-list)
                                     (apply max (map #(count (:name %)) final-tasks-list)))
+
+          ;; Build all task components
           task-sys (->> final-tasks-list
                         (map (fn [{:keys [name depends_on] :as task-def}]
                                (let [;; loggable name padded to longest task name for prettier logs
@@ -57,12 +58,8 @@
                                  (hash-map (keyword name) task))))
                         (into {}))
 
+          ;; Add watchdog that depends on all tasks
           task-sys (assoc task-sys :watchdog (component/using
-                                              (watchdog/create {:exit-mode exit-mode
-                                                                :stop-fn (fn [{:keys [exit]}]
-                                                                           (Thread/sleep 300) ;; allow logs to flush
-                                                                           (shutdown-agents)
-                                                                           (exit/exit! exit))})
-
+                                              (watchdog/create {:exit-mode exit-mode})
                                               (mapv keyword (keys task-sys))))]
       (component/map->SystemMap task-sys))))
