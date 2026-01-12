@@ -1,0 +1,13 @@
+tasks:
+  - name: foobar
+    command: sh -c 'while true ; do echo foobar && sleep 1 ; done'
+
+  - name: barbaz
+    command: sh -c 'while true ; do echo barbaz && sleep 1 ; done'
+    depends_on:
+      - foobar
+
+  - name: quxbaz
+    command: sh -c 'while true ; do echo barbaz && sleep 1 ; done'
+    depends_on:
+      - barbaz
