@@ -91,24 +91,33 @@
 (defmethod cli-dispatch :print-tasks [{:keys [system context] :as _args}]
   (log/with-context {:task "geppetto"}
     (log/info "Tasks defined in config:")
+    (doseq [task (-> context :tasks)]
+      (println (str "- " (:name task)))
+      (when-let [task-tags (seq (:tags task))]
+        (println (str "    Tags: " (str/join ", " (sort task-tags)))))
+
+      (when-let [deps (:depends_on task)]
+        (println (str "    Depends on: " (str/join ", " (sort deps))))))
+
     (when (or (seq (:tasks-to-launch context))
               (seq (:tags context)))
+      (log/info "Effective filters applied:")
       (log/infof "Active filters: %s %s"
                  (if (empty? (:tasks-to-launch context))
-                   "none"
+                   "tasks=none"
                    (str "tasks=" (str/join ", " (sort (:tasks-to-launch context)))))
                  (if (empty? (:tags context))
-                   "none"
-                   (str "tags=" (str/join ", " (sort (:tags context)))))))
+                   "tags=none"
+                   (str "tags=" (str/join ", " (sort (:tags context))))))
 
-    (doseq [task-name (->> system
-                           keys
-                           (remove #{:watchdog})
-                           sort)]
+      (doseq [task-name (->> system
+                             keys
+                             (remove #{:watchdog})
+                             sort)]
 
-      (println (str "- " (name task-name)))
-      (when-let [task-tags (seq (:tags (get system task-name)))]
-        (println (str "    Tags: " (str/join ", " (sort task-tags))))))
+        (println (str "- " (name task-name)))
+        (when-let [task-tags (seq (:tags (get system task-name)))]
+          (println (str "    Tags: " (str/join ", " (sort task-tags)))))))
     (exit/exit! 0)))
 
 (defmethod cli-dispatch :start [{:keys [system context] :as _args}]
@@ -164,9 +173,8 @@
                                        config-file
 
                                        :else
-                       ;; assume config-file path is relative to cwd
+                                       ;; assume config-file path is relative to cwd
                                        (str "./" config-file))
-
                     {:keys [print-tasks tags exit-mode tasks-to-launch]} options
                     {:keys [tasks _settings] :as _conf} (config/load! config-file-path)
 

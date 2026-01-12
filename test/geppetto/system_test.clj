@@ -112,4 +112,8 @@
 
   (testing "multiple tag filter with all tags includes everything"
     (let [sys (system/build {:tasks tasks-with-deps-and-tags :tasks-to-launch #{} :tags #{"backend" "frontend" "admin"}})]
-      (is (= #{:db :api :worker :frontend :admin :watchdog} (set (keys sys)))))))
+      (is (= #{:db :api :worker :frontend :admin :watchdog} (set (keys sys))))))
+
+  (testing "sanity check: no filters includes only untagged tasks"
+    (let [sys (system/build {:tasks tasks-with-deps-and-tags :tasks-to-launch #{} :tags #{}})]
+      (is (= #{:db :watchdog} (set (keys sys)))))))

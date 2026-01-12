@@ -56,7 +56,7 @@
 
 (def TaskConfig
   [:map
-       ;; TODO - configure:
+   ;; TODO - configure:
    ;; - output format (text or json)
    ;; - default workdir, to override resolving relative paths based on config file location
    [:settings
@@ -82,27 +82,27 @@
                                                  println))))
   conf)
 
-(defn- resolve-task-dir [{:keys [dir] :as task} {:keys [config-file-dir]}]
+(defn- resolve-task-dir [{:keys [dir] :as task}
+                         {:keys [config-file-dir]}]
   (log/with-context {:task (:name task)}
-
     (cond
-    ;; bail out - nothing to do
+      ;; bail out - nothing to do
       (not dir)
       task
 
-    ;; bail out - nothing to do
+      ;; bail out - nothing to do
       (and (not-empty dir) (fs/absolute? dir) (fs/exists? dir))
       (do
         (log/debugf "Task '%s' has an absolute working directory that exists: %s"
                     (:name task) dir)
         task)
 
-    ;; we have a dir, it's absolute, but it doesn't exist
+      ;; we have a dir, it's absolute, but it doesn't exist
       (and (not-empty dir) (fs/absolute? dir) (not (fs/exists? dir)))
       (errors/raise! ::errors/task-dir-doesnt-exist
                      #(log/errorf "FATAL: task specifies a working directory that doesn't exist: %s" dir))
 
-    ;; we have a dir, it's relative - resolve it
+      ;; we have a dir, it's relative - resolve it
       (and (not-empty dir) (not (fs/absolute? dir)))
       (let [final-path (-> (str config-file-dir "/" dir)
                            fs/absolutize
@@ -139,7 +139,7 @@
   "Figures out other things post-structure validation:
   - resolves workdirs so that they're absolute path, with the config location being the root in case of relative paths
   - ensures that `depends_on` references existing tasks
-"
+  "
   [conf {:keys [config-file-dir]}]
   (-> conf
       (update :tasks (fn [tasks]
@@ -157,13 +157,11 @@
 (defn load! [conf-path]
   (when (str/blank? conf-path)
     (errors/raise! ::errors/config-not-found))
-  (let [conf-path (fs/expand-home conf-path)
+  (let [conf-path (str (fs/expand-home conf-path))
         _ (when-not (fs/exists? conf-path)
             (errors/raise! ::errors/config-not-found))
-        ;; we're good to go
         config-file-dir (str (fs/normalize (fs/absolutize (fs/parent conf-path))))
-        _ (log/debugf "Loading config from %s (config root dir: %s)" conf-path config-file-dir)
-        conf-data (->> (yaml/parse-string (slurp (str conf-path)))
+        conf-data (->> (yaml/parse-string (slurp conf-path))
                        ;; convert ordered-map to regular maps, they're easier to work with
                        (walk/postwalk (fn [thing]
                                         (if (instance? ordered-map-class thing)
