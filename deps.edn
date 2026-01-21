@@ -1,4 +1,4 @@
-{:paths ["src"]
+{:paths ["src" "resources"]
  :deps {org.clojure/clojure {:mvn/version "1.12.3"}
         com.stuartsierra/component {:mvn/version "1.2.0"}
         metosin/malli {:mvn/version "0.19.2"}

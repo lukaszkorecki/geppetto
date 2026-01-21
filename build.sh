@@ -13,6 +13,7 @@ native-image \
     -H:+ReportExceptionStackTraces \
     -H:+UnlockExperimentalVMOptions \
 		-H:-AddAllFileSystemProviders \
+    -H:IncludeResources="VERSION" \
     --features=clj_easy.graal_build_time.InitClojureClasses \
     --enable-url-protocols=http,https \
 		--initialize-at-build-time \

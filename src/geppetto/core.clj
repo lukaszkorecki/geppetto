@@ -1,6 +1,7 @@
 (ns geppetto.core
   (:gen-class)
   (:require
+   [clojure.java.io :as io]
    [clojure.string :as str]
    [clojure.tools.cli :as cli]
    [com.stuartsierra.component :as component]
@@ -18,7 +19,9 @@
 ;; NOTE: DEBUG flag only has effect in JVM version, since native-image compilation will inline the value of the env var and disable debug logging if not set during build time!
 (logger/init! {:debug? (not-empty (System/getenv "DEBUG"))})
 
-(def version "0.0.1")
+(def version
+  (or (some-> (io/resource "VERSION") slurp str/trim)
+      "0.0.0-dev"))
 
 (def ^:private default-mode ::watchdog/all)
 
