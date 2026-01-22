@@ -14,5 +14,8 @@ build-linux-amd64: # build linux amd64 binary in Docker
 build-linux-arm64: # build linux arm64 binary in Docker
 	echo 'no-op'
 
+release: build-macos-arm64 # create a GitHub release
+	./release.sh
+
 help:
 	@awk '/^[a-z_\-]+:/ { print $$1 }' ./Makefile | sort

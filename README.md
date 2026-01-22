@@ -17,15 +17,23 @@ Think of it as a simple process orchestrator for development environments, integ
 - **Parallel Execution**: Runs tasks concurrently while respecting dependencies
 - **Dependency Management**: Tasks can depend on other tasks; dependent tasks only start after their dependencies are running
 - **Color-Coded Output**: Each task gets a unique color for easy visual identification
-- **Environment Variables**: Set custom environment variables per task
+- **Environment Variables**: Set custom environment variables per task or load from files
+- **Tag-Based Filtering**: Run only tasks with specific tags
 - **Process Lifecycle Management**: Proper cleanup and signal handling
 - **Native Binary**: Compiles to a native executable using GraalVM for fast startup and zero-dependency installations
 - **Configuration Validation**: Schema validation ensures your config is correct before execution
 
 ## Installation
 
+### From GitHub Releases
 
-**TODO**: get the binary from GH releases
+Download the latest binary from [GitHub Releases](https://github.com/lukaszkorecki/geppetto/releases):
+
+```bash
+# macOS ARM64
+curl -L https://github.com/lukaszkorecki/geppetto/releases/latest/download/geppetto-macos-arm64 -o geppetto
+chmod +x geppetto
+```
 
 ### Building from Source
 
@@ -36,11 +44,11 @@ Requirements:
 For fastest setup, [Mise](https://mise.jdx.dev/) config is provided.
 
 ```bash
-# assuming mise is actiaveted
+# assuming mise is activated
 ./build.sh
 ```
 
-This creates a native `geppetto` binary in the current directory.
+This creates a native `geppetto` binary in `./bin/`.
 
 ## Hacking
 
@@ -50,12 +58,25 @@ Geppetto is written in Clojure, so it's easy to work on and extend. You can star
 clojure -M:start <flags>
 ```
 
-
-
 ## Usage
 
 ```bash
-./geppetto <config-file.yaml>
+geppetto [options] <config-file.yaml>
+```
+
+### CLI Options
+
+```
+-e, --exit-mode MODE   Exit behavior when tasks complete or fail (default: all)
+                       - all: wait for ALL tasks to complete
+                       - any: exit when ANY task completes (successful or failed)
+                       - on-failure: exit immediately when ANY task fails (non-zero exit)
+-t, --tasks TASKS      Comma separated list of tasks to run (default: all)
+-T, --tags TAGS        Comma separated list of tags to filter tasks (default: all)
+-p, --print-tasks      Print the list of tasks defined in config and exit
+-v, --version          Show version
+-h, --help             Show help
+    --debug            Enable debug logging (also via DEBUG env var)
 ```
 
 ### Configuration Format
@@ -71,19 +92,20 @@ tasks:
 
   - name: backend
     command: clj -M:start
-    cwd: ./backend
-    deps:
+    dir: ./backend
+    depends_on:
       - database
     env:
       DATABASE_URL: postgresql://localhost:5432/mydb
+    env_file: .env.local
 
   - name: nginx
     command: nginx ./dev.conf
 
   - name: frontend
     command: npm run start
-    cwd: ./frontend/
-    deps:
+    dir: ./frontend/
+    depends_on:
       - backend
     env:
       API_URL: http://localhost:3000
@@ -96,19 +118,21 @@ tasks:
 
 Each task supports the following properties:
 
-- **`name`** (required): Unique identifier for the task
-- **`command`** (required): Shell command to execute
-- **`cwd`** (optional): Working directory for the command
-- **`deps`** (optional): List of task names this task depends on
-- **`env`** (optional): Map of environment variables (can be empty `{}`)
-- **`tags`** (optional): List of tags for organization/filtering
+| Property | Required | Description |
+|----------|----------|-------------|
+| `name` | Yes | Unique identifier for the task |
+| `command` | Yes | Shell command to execute |
+| `dir` | No | Working directory for the command |
+| `depends_on` | No | List of task names this task depends on |
+| `env` | No | Map of environment variables |
+| `env_file` | No | Path to a file to load environment variables from |
+| `tags` | No | List of tags for filtering |
 
 ### Special Environment Variables
 
 Geppetto automatically sets the following environment variables for each task:
 
 - **`GP_ID`**: The name of the current task
-
 
 ## How It Works
 
@@ -123,15 +147,14 @@ The dependency system ensures tasks start in the correct order, with dependent t
 
 ## Platform Support
 
-Currently builds native binaries for **macOS**. Linux support is planned.
+Currently builds native binaries for **macOS ARM64**. Linux support is planned.
 
 ## Roadmap
 
 - [ ] Linux native binary builds
-- [ ] Tag-based filtering (run only tasks with specific tags)
-- [ ] CLI improvements (better argument parsing)
 - [ ] Environment variable interpolation
-- [ ] Load environment from command output (`env-from`)
+- [ ] Load environment from command output (`env_command`)
+- [ ] Global settings (`root_dir`)
 - [ ] Task restart policies
 - [ ] Health checks
 - [ ] Better error handling and reporting
