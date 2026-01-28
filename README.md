@@ -8,17 +8,17 @@ Ever wanted something like Docker Compose, but without Docker? [Foreman](https:/
 
 ## What is Geppetto?
 
-Geppetto uses a YAML-based configuration file defining tasks and their dependencies, then runs them in parallel while respecting the dependency graph. Each task's output is color-coded and prefixed with the task name and process ID, making it easy to track multiple concurrent processes.
+Geppetto uses a YAML-based configuration file defining services and their dependencies, then runs them in parallel while respecting the dependency graph. Each service's output is color-coded and prefixed with the service name and process ID, making it easy to track multiple concurrent processes.
 
 Think of it as a simple process orchestrator for development environments, integration testing, or managing multiple services locally.
 
 ## Features
 
-- **Parallel Execution**: Runs tasks concurrently while respecting dependencies
-- **Dependency Management**: Tasks can depend on other tasks; dependent tasks only start after their dependencies are running
-- **Color-Coded Output**: Each task gets a unique color for easy visual identification
-- **Environment Variables**: Set custom environment variables per task or load from files
-- **Tag-Based Filtering**: Run only tasks with specific tags
+- **Parallel Execution**: Runs services concurrently while respecting dependencies
+- **Dependency Management**: Services can depend on other services; dependent services only start after their dependencies are running
+- **Color-Coded Output**: Each service gets a unique color for easy visual identification
+- **Environment Variables**: Set custom environment variables per service or load from files
+- **Tag-Based Filtering**: Run only services with specific tags
 - **Process Lifecycle Management**: Proper cleanup and signal handling
 - **Native Binary**: Compiles to a native executable using GraalVM for fast startup and zero-dependency installations
 - **Configuration Validation**: Schema validation ensures your config is correct before execution
@@ -67,13 +67,13 @@ geppetto [options] <config-file.yaml>
 ### CLI Options
 
 ```
--e, --exit-mode MODE   Exit behavior when tasks complete or fail (default: all)
-                       - all: wait for ALL tasks to complete
-                       - any: exit when ANY task completes (successful or failed)
-                       - on-failure: exit immediately when ANY task fails (non-zero exit)
--t, --tasks TASKS      Comma separated list of tasks to run (default: all)
--T, --tags TAGS        Comma separated list of tags to filter tasks (default: all)
--p, --print-tasks      Print the list of tasks defined in config and exit
+-e, --exit-mode MODE   Exit behavior when services complete or fail (default: all)
+                       - all: wait for ALL services to complete
+                       - any: exit when ANY service completes (successful or failed)
+                       - on-failure: exit immediately when ANY service fails (non-zero exit)
+-s, --services SERVICES  Comma separated list of services to run (default: all)
+-t, --tags TAGS        Comma separated list of tags to filter services (default: all)
+-p, --print-services   Print the list of services defined in config and exit
 -v, --version          Show version
 -h, --help             Show help
     --debug            Enable debug logging (also via DEBUG env var)
@@ -81,10 +81,10 @@ geppetto [options] <config-file.yaml>
 
 ### Configuration Format
 
-Create a YAML file defining your tasks:
+Create a YAML file defining your services:
 
 ```yaml
-tasks:
+services:
   - name: database
     command: docker compose up postgres
     env:
@@ -114,36 +114,36 @@ tasks:
       - dev
 ```
 
-### Task Configuration
+### Service Configuration
 
-Each task supports the following properties:
+Each service supports the following properties:
 
 | Property | Required | Description |
 |----------|----------|-------------|
-| `name` | Yes | Unique identifier for the task |
+| `name` | Yes | Unique identifier for the service |
 | `command` | Yes | Shell command to execute |
 | `dir` | No | Working directory for the command |
-| `depends_on` | No | List of task names this task depends on |
+| `depends_on` | No | List of service names this service depends on |
 | `env` | No | Map of environment variables |
 | `env_file` | No | Path to a file to load environment variables from |
 | `tags` | No | List of tags for filtering |
 
 ### Special Environment Variables
 
-Geppetto automatically sets the following environment variables for each task:
+Geppetto automatically sets the following environment variables for each service:
 
-- **`GP_ID`**: The name of the current task
+- **`geppetto.service-name`**: The name of the current service
 
 ## How It Works
 
-Geppetto uses [Stuart Sierra's Component library](https://github.com/stuartsierra/component) to manage the task lifecycle and dependency graph. Each task is a component that:
+Geppetto uses [Stuart Sierra's Component library](https://github.com/stuartsierra/component) to manage the service lifecycle and dependency graph. Each service is a component that:
 
 1. Starts a process when initialized
 2. Streams stdout/stderr with colored, prefixed output
 3. Monitors process health
 4. Properly cleans up on shutdown
 
-The dependency system ensures tasks start in the correct order, with dependent tasks waiting for their dependencies to be running before starting.
+The dependency system ensures services start in the correct order, with dependent services waiting for their dependencies to be running before starting.
 
 ## Platform Support
 
@@ -155,6 +155,6 @@ Currently builds native binaries for **macOS ARM64**. Linux support is planned.
 - [ ] Environment variable interpolation
 - [ ] Load environment from command output (`env_command`)
 - [ ] Global settings (`root_dir`)
-- [ ] Task restart policies
+- [ ] Service restart policies
 - [ ] Health checks
 - [ ] Better error handling and reporting

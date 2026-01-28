@@ -1,4 +1,4 @@
-tasks:
+services:
   - name: time
     command: time
     dir: ./bin

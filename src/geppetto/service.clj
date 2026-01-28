@@ -1,4 +1,4 @@
-(ns geppetto.task
+(ns geppetto.service
   (:require
    [babashka.process :as proc]
    [clojure.java.io :as io]
@@ -9,28 +9,28 @@
 
 (set! *warn-on-reflection* true)
 
-(defprotocol ITask
-  (status [this] "Get status of a task")
-  (alive? [this] "Return true if task process is still running")
+(defprotocol IService
+  (status [this] "Get status of a service")
+  (alive? [this] "Return true if service process is still running")
   (exit-code [this] "Return exit code of finished process, or nil if still running"))
 
-(defrecord ATask [command
-                  name
-                  loggable-name
-                  tags
-                  env
-                  dir
+(defrecord AService [command
+                     name
+                     loggable-name
+                     tags
+                     env
+                     dir
                   ;; TODO
-                  env_command
-                  env_file
+                     env_command
+                     env_file
 
                   ;; internal state:
-                  process
-                  out-thread
-                  err-thread
-                  monitor-thread]
+                     process
+                     out-thread
+                     err-thread
+                     monitor-thread]
 
-  ITask
+  IService
   (status [this]
     (if-let [process (:process this)]
       (if (proc/alive? process)
@@ -53,8 +53,8 @@
   (start [this]
     (if (:process this)
       this
-      (let [env (merge env {"geppetto.task-name" name})
-            _ (log/with-context {:task (or loggable-name name)}
+      (let [env (merge env {"geppetto.service-name" name})
+            _ (log/with-context {:service (or loggable-name name)}
                 (log/infof "starting %s in %s " command dir))
             {:keys [out err] :as process} (proc/process command {:extra-env env
                                                                  :dir dir})
@@ -64,7 +64,7 @@
                              (with-open [rdr (io/reader out)]
                                (loop []
                                  (when-let [line (BufferedReader/.readLine rdr)]
-                                   (log/with-context {:task (or loggable-name name) :dev "stdout"}
+                                   (log/with-context {:service (or loggable-name name) :dev "stdout"}
                                      #_{:clj-kondo/ignore [:mokujin.log/log-message-not-string]}
                                      (log/info line))
                                    (recur))))))
@@ -74,7 +74,7 @@
                              (with-open [rdr (io/reader err)]
                                (loop []
                                  (when-let [line (BufferedReader/.readLine rdr)]
-                                   (log/with-context {:task (or loggable-name name) :dev "stderr"}
+                                   (log/with-context {:service (or loggable-name name) :dev "stderr"}
                                      (log/error line))
                                    (recur))))))]
 
@@ -87,7 +87,7 @@
                :err-thread stderr-thread))))
 
   (stop [this]
-    (log/warn "Stopping" {:task loggable-name})
+    (log/warn "Stopping" {:service loggable-name})
     (when-let [process (:process this)]
       (when (proc/alive? process)
         (proc/destroy-tree process))
@@ -100,5 +100,5 @@
              :out-thread nil
              :err-thread nil))))
 
-(defn create [task-def]
-  (map->ATask task-def))
+(defn create [service-def]
+  (map->AService service-def))

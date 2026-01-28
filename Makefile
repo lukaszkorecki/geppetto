@@ -1,5 +1,5 @@
 fmt: # format the codebase
-	sed -i '' 's/[[:space:]]*$$//' */**/*.clj */**/*.sh
+	sed -i '' 's/[[:space:]]*$$//' */**/*.clj
 	clojure-lsp format
 
 build-bin: build-macos-arm64 build-linux-amd64 build-linux-arm64 # build all binaries

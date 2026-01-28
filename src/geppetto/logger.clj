@@ -11,7 +11,7 @@
     [:appender {:name "STDOUT", :class "ch.qos.logback.core.ConsoleAppender"}
      [:withJansi true]
      [:encoder
-      [:pattern "%X{task} | %X{event} %m%n"]]]
+      [:pattern "%X{service} | %X{event} %m%n"]]]
     [:root {:level (if debug? "DEBUG" "INFO")}
      [:appender-ref {:ref "STDOUT"}]]]))
 
@@ -39,7 +39,7 @@
   (delay (boolean (System/getenv "NO_COLOR"))))
 
 (defn colorize
-  "Calculate hash and return ANSI color code string for task name"
+  "Calculate hash and return ANSI color code string for service name"
   [name]
   (if @no-color?
     name

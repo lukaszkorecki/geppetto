@@ -1,5 +1,5 @@
 
-tasks:
+services:
   - name: simple-bin
     command: ./process-simulator.clj --print-interval-ms=500
     dir: ./test

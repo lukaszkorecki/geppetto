@@ -9,11 +9,11 @@
    ;; fatal errors
    ::config-not-found {:message "Configuration file not found." :exit-code 1}
    ::invalid-config {:message "Configuration file is invalid." :exit-code 2}
-   ::task-dir-doesnt-exist {:message "Task working directory does not exist." :exit-code 3}
-   ::task-env-file-doesnt-exist {:message "Task environment file does not exist." :exit-code 3}
-   ::invalid-task-dependency {:message "Task has an invalid dependency." :exit-code 4}
-   ::no-matching-tasks {:message "No matching tasks found to launch." :exit-code 5}
-   ::no-tasks-in-config {:message "No tasks defined in configuration." :exit-code 6}})
+   ::service-dir-doesnt-exist {:message "Service working directory does not exist." :exit-code 3}
+   ::service-env-file-doesnt-exist {:message "Service environment file does not exist." :exit-code 3}
+   ::invalid-service-dependency {:message "Service has an invalid dependency." :exit-code 4}
+   ::no-matching-services {:message "No matching services found to launch." :exit-code 5}
+   ::no-services-in-config {:message "No services defined in configuration." :exit-code 6}})
 
 (defn type->exc
   ([type]

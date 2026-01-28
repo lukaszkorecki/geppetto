@@ -27,7 +27,7 @@
 
 (def cli-options
   [["-e" "--exit-mode EXIT_MODE"
-    (str "Exit behavior when tasks complete or fail:\n"
+    (str "Exit behavior when services complete or fail:\n"
          (str/join "\n" (map (fn [[mode desc]]
                                (str "                                 - " (name mode) ": " desc))
                              (sort-by (comp name first) watchdog/valid-modes))))
@@ -38,12 +38,12 @@
     :validate [(set (keys watchdog/valid-modes))
                (str "Must be one of: " (str/join ", " (map name (keys watchdog/valid-modes))))]]
 
-   ["-t" "--tasks TASKS" "Comma separated list of tasks to run (default: all tasks in config)"
-    :id :tasks-to-launch
+   ["-s" "--services SERVICES" "Comma separated list of services to run (default: all services in config)"
+    :id :services-to-launch
     :parse-fn #(set (str/split % #","))
     :default #{}]
 
-   ["-T" "--tags TAGS" "Comma separated list of tags to filter tasks to run (default: all tasks in config)"
+   ["-t" "--tags TAGS" "Comma separated list of tags to filter services to run (default: all services in config)"
     :id :tags
     :parse-fn #(set (str/split % #","))
     :default #{}]
@@ -54,8 +54,8 @@
    ["-v" "--version" "Show version"
     :id :print-version]
 
-   ["-p" "--print-tasks" "Print the list of tasks defined in the config file and exit"
-    :id :print-tasks]
+   ["-p" "--print-services" "Print the list of services defined in the config file and exit"
+    :id :print-services]
 
    [nil "--debug" "Enable debug logging. Can be also enabled by setting DEBUG env var to non-empty value."
     :id :debug]])
@@ -71,7 +71,7 @@
 
 (defmethod cli-dispatch :help [{:keys [summary errors] :as _args}]
   (let [help-text (str/join \newline
-                            ["Geppetto - A simple task runner"
+                            ["Geppetto - A simple service runner"
                              (str "Version: " version)
                              ""
                              "Usage: geppetto [options] <config-file>"
@@ -91,44 +91,44 @@
                  :summary summary
                  :errors errors}))
 
-(defmethod cli-dispatch :print-tasks [{:keys [system context] :as _args}]
-  (log/with-context {:task "geppetto"}
-    (log/info "Tasks defined in config:")
-    (doseq [task (-> context :tasks)]
-      (println (str "- " (:name task)))
-      (when-let [task-tags (seq (:tags task))]
-        (println (str "    Tags: " (str/join ", " (sort task-tags)))))
+(defmethod cli-dispatch :print-services [{:keys [system context] :as _args}]
+  (log/with-context {:service "geppetto"}
+    (log/info "Services defined in config:")
+    (doseq [svc (-> context :services)]
+      (println (str "- " (:name svc)))
+      (when-let [svc-tags (seq (:tags svc))]
+        (println (str "    Tags: " (str/join ", " (sort svc-tags)))))
 
-      (when-let [deps (:depends_on task)]
+      (when-let [deps (:depends_on svc)]
         (println (str "    Depends on: " (str/join ", " (sort deps))))))
 
-    (when (or (seq (:tasks-to-launch context))
+    (when (or (seq (:services-to-launch context))
               (seq (:tags context)))
       (log/info "Effective filters applied:")
       (log/infof "Active filters: %s %s"
-                 (if (empty? (:tasks-to-launch context))
-                   "tasks=none"
-                   (str "tasks=" (str/join ", " (sort (:tasks-to-launch context)))))
+                 (if (empty? (:services-to-launch context))
+                   "services=none"
+                   (str "services=" (str/join ", " (sort (:services-to-launch context)))))
                  (if (empty? (:tags context))
                    "tags=none"
                    (str "tags=" (str/join ", " (sort (:tags context))))))
 
-      (doseq [task-name (->> system
-                             keys
-                             (remove #{:watchdog})
-                             sort)]
+      (doseq [svc-name (->> system
+                            keys
+                            (remove #{:watchdog})
+                            sort)]
 
-        (println (str "- " (name task-name)))
-        (when-let [task-tags (seq (:tags (get system task-name)))]
-          (println (str "    Tags: " (str/join ", " (sort task-tags)))))))
+        (println (str "- " (name svc-name)))
+        (when-let [svc-tags (seq (:tags (get system svc-name)))]
+          (println (str "    Tags: " (str/join ", " (sort svc-tags)))))))
     (exit/exit! 0)))
 
 (defmethod cli-dispatch :start [{:keys [system context] :as _args}]
-  (log/with-context {:task "geppetto"}
-    (let [task-count (dec (count system))] ;; subtract watchdog
+  (log/with-context {:service "geppetto"}
+    (let [service-count (dec (count system))] ;; subtract watchdog
 
-      (log/with-context {:event "START" :task "geppetto"}
-        (log/infof "Starting with config %s - %s tasks\n" (:config-file context) task-count))
+      (log/with-context {:event "START" :service "geppetto"}
+        (log/infof "Starting with config %s - %s services\n" (:config-file context) service-count))
 
       ;; Start the system
       (let [started-system (component/start-system system)
@@ -136,11 +136,11 @@
             wd (:watchdog started-system)
             {:keys [exit reason] :as _exit-info} (watchdog/wait-for-exit wd)]
 
-        (log/with-context {:task "geppetto"}
+        (log/with-context {:service "geppetto"}
           (log/infof "Shutdown requested: %s" reason))
 
         ;; Graceful shutdown: stop all components
-        (log/with-context {:task "geppetto"}
+        (log/with-context {:service "geppetto"}
           (log/info "Stopping system components..."))
 
         (component/stop-system started-system)
@@ -178,22 +178,22 @@
                                        :else
                                        ;; assume config-file path is relative to cwd
                                        (str "./" config-file))
-                    {:keys [print-tasks tags exit-mode tasks-to-launch]} options
-                    {:keys [tasks _settings] :as _conf} (config/load! config-file-path)
+                    {:keys [print-services tags exit-mode services-to-launch]} options
+                    {:keys [services _settings] :as _conf} (config/load! config-file-path)
 
-                    _ (when (empty? tasks)
-                        (errors/raise! ::errors/no-tasks-in-config))
+                    _ (when (empty? services)
+                        (errors/raise! ::errors/no-services-in-config))
 
-                    context {:tasks tasks
+                    context {:services services
                              :config-file config-file-path
-                             :tasks-to-launch tasks-to-launch
+                             :services-to-launch services-to-launch
                              :tags tags
                              :exit-mode exit-mode}
 
                     system (system/build context)]
 
-                (if print-tasks
-                  {:action :print-tasks
+                (if print-services
+                  {:action :print-services
                    :system system
                    :context context}
 
