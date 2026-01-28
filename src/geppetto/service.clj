@@ -3,6 +3,7 @@
    [babashka.process :as proc]
    [clojure.java.io :as io]
    [com.stuartsierra.component :as component]
+   [geppetto.logger :as logger]
    [mokujin.log :as log])
   (:import
    [java.io BufferedReader]))
@@ -20,11 +21,12 @@
                      tags
                      env
                      dir
-                  ;; TODO
+                     ;; TODO
                      env_command
                      env_file
+                     parse_json_logs
 
-                  ;; internal state:
+                     ;; internal state:
                      process
                      out-thread
                      err-thread
@@ -64,9 +66,10 @@
                              (with-open [rdr (io/reader out)]
                                (loop []
                                  (when-let [line (BufferedReader/.readLine rdr)]
-                                   (log/with-context {:service (or loggable-name name) :dev "stdout"}
-                                     #_{:clj-kondo/ignore [:mokujin.log/log-message-not-string]}
-                                     (log/info line))
+                                   (let [formatted (logger/format-line line {:parse-json? parse_json_logs})]
+                                     (log/with-context {:service (or loggable-name name) :dev "stdout"}
+                                       #_{:clj-kondo/ignore [:mokujin.log/log-message-not-string]}
+                                       (log/info formatted)))
                                    (recur))))))
 
             stderr-thread (Thread.
@@ -74,8 +77,9 @@
                              (with-open [rdr (io/reader err)]
                                (loop []
                                  (when-let [line (BufferedReader/.readLine rdr)]
-                                   (log/with-context {:service (or loggable-name name) :dev "stderr"}
-                                     (log/error line))
+                                   (let [formatted (logger/format-line line {:parse-json? parse_json_logs})]
+                                     (log/with-context {:service (or loggable-name name) :dev "stderr"}
+                                       (log/error formatted)))
                                    (recur))))))]
 
         (Thread/.start stdout-thread)

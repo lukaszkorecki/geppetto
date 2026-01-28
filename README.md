@@ -127,6 +127,7 @@ Each service supports the following properties:
 | `env` | No | Map of environment variables |
 | `env_file` | No | Path to a file to load environment variables from |
 | `tags` | No | List of tags for filtering |
+| `parse_json_logs` | No | Parse JSON log lines and output as readable YAML |
 
 ### Special Environment Variables
 

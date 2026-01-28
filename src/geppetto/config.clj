@@ -52,7 +52,12 @@
    [:env_file
     {:description "Path to a file to load environment variables from for the service. Can be absolute or relative  to :dir if specified, otherwise  relative to config root"
      :optional true}
-    :string]])
+    :string]
+
+   [:parse_json_logs
+    {:description "Parse JSON log lines and output as readable YAML"
+     :optional true}
+    :boolean]])
 
 (def ServiceConfig
   [:map
