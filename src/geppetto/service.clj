@@ -57,7 +57,9 @@
       this
       (let [env (merge env {"geppetto.service-name" name})
             _ (log/with-context {:service (or loggable-name name)}
-                (log/infof "starting %s in %s " command dir))
+                (if dir
+                  (log/infof "starting '%s' in %s" command dir)
+                  (log/infof "starting '%s'" command)))
             {:keys [out err] :as process} (proc/process command {:extra-env env
                                                                  :dir dir})
 

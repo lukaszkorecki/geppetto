@@ -55,7 +55,7 @@ This creates a native `geppetto` binary in `./bin/`.
 Geppetto is written in Clojure, so it's easy to work on and extend. You can start it by running
 
 ```
-clojure -M:start <flags>
+clojure -M:run <flags>
 ```
 
 ## Usage
@@ -73,6 +73,7 @@ geppetto [options] <config-file.yaml>
                        - on-failure: exit immediately when ANY service fails (non-zero exit)
 -s, --services SERVICES  Comma separated list of services to run (default: all)
 -t, --tags TAGS        Comma separated list of tags to filter services (default: all)
+-r, --root ROOT        Root directory for resolving relative service paths (default: config file directory)
 -p, --print-services   Print the list of services defined in config and exit
 -v, --version          Show version
 -h, --help             Show help
@@ -84,6 +85,9 @@ geppetto [options] <config-file.yaml>
 Create a YAML file defining your services:
 
 ```yaml
+settings:
+  root_dir: ~/projects  # Optional: base directory for relative paths (default: config file location)
+
 services:
   - name: database
     command: docker compose up postgres
@@ -129,6 +133,19 @@ Each service supports the following properties:
 | `tags` | No | List of tags for filtering |
 | `parse_json_logs` | No | Parse JSON log lines and output as readable YAML |
 
+### Root Directory Resolution
+
+Relative paths in service `dir` and `env_file` are resolved against a root directory. The resolution priority is:
+
+1. `--root` CLI flag (highest priority)
+2. `settings.root_dir` in config file
+3. Config file's parent directory (default)
+
+This allows separating config files from project directories:
+```bash
+geppetto ~/configs/services.yaml --root ~/projects
+```
+
 ### Special Environment Variables
 
 Geppetto automatically sets the following environment variables for each service:
@@ -155,7 +172,7 @@ Currently builds native binaries for **macOS ARM64**. Linux support is planned.
 - [ ] Linux native binary builds
 - [ ] Environment variable interpolation
 - [ ] Load environment from command output (`env_command`)
-- [ ] Global settings (`root_dir`)
+- [ ] Per-service log files with rotation
 - [ ] Service restart policies
 - [ ] Health checks
 - [ ] Better error handling and reporting

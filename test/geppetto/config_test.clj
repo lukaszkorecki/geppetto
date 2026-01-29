@@ -20,25 +20,25 @@
         config-file-dir (str temp-dir)]
     (testing "when :dir is not present"
       (let [svc {:name "svc-1" :command "command-1"}]
-        (is (= svc (#'config/resolve-service-dir svc {:config-file-dir config-file-dir})))))
+        (is (= svc (#'config/resolve-service-dir svc {:root-dir config-file-dir})))))
 
     (testing "when :dir is absolute and exists"
       (let [svc {:name "svc-1" :command "command-1" :dir (str temp-dir)}]
-        (is (= svc (#'config/resolve-service-dir svc {:config-file-dir config-file-dir})))))
+        (is (= svc (#'config/resolve-service-dir svc {:root-dir config-file-dir})))))
 
     (testing "when :dir is absolute and does not exist"
       (let [svc {:name "svc-1" :command "command-1" :dir "/non-existent-dir"}]
-        (is (thrown? clojure.lang.ExceptionInfo (#'config/resolve-service-dir svc {:config-file-dir config-file-dir})))))
+        (is (thrown? clojure.lang.ExceptionInfo (#'config/resolve-service-dir svc {:root-dir config-file-dir})))))
 
     (testing "when :dir is relative and resolves correctly"
       (let [svc {:name "svc-1" :command "command-1" :dir "subdir"}
             _ (fs/create-dir (fs/path config-file-dir "subdir"))
-            resolved-svc (#'config/resolve-service-dir svc {:config-file-dir config-file-dir})]
+            resolved-svc (#'config/resolve-service-dir svc {:root-dir config-file-dir})]
         (is (= (str (fs/absolutize (fs/path config-file-dir "subdir"))) (:dir resolved-svc)))))
 
     (testing "when :dir is relative and does not resolve"
       (let [svc {:name "svc-1" :command "command-1" :dir "non-existent-subdir"}]
-        (is (thrown? clojure.lang.ExceptionInfo (#'config/resolve-service-dir svc {:config-file-dir config-file-dir})))))))
+        (is (thrown? clojure.lang.ExceptionInfo (#'config/resolve-service-dir svc {:root-dir config-file-dir})))))))
 
 (deftest parse-env-file-test
   (testing "parses a .env file correctly"
@@ -57,7 +57,7 @@
                  :command "command-1"
                  :env_file "test.env"
                  :env {:EXISTING_VAR "some-value"}}
-            resolved-svc (config/resolve-env svc {:config-file-dir config-file-dir})
+            resolved-svc (config/resolve-env svc {:root-dir config-file-dir})
             expected-env {:EXISTING_VAR "some-value"
                           "VAR1" "value1"
                           "VAR2" "\"value2\""
@@ -66,7 +66,7 @@
 
     (testing "when env_file does not exist"
       (let [svc {:name "svc-1" :command "command-1" :env_file "non-existent.env"}]
-        (is (thrown? clojure.lang.ExceptionInfo (config/resolve-env svc {:config-file-dir config-file-dir})))))))
+        (is (thrown? clojure.lang.ExceptionInfo (config/resolve-env svc {:root-dir config-file-dir})))))))
 
 (deftest load-test
   (testing "with a valid config"

@@ -88,7 +88,7 @@
   conf)
 
 (defn- resolve-service-dir [{:keys [dir] :as svc}
-                            {:keys [config-file-dir]}]
+                            {:keys [root-dir]}]
   (log/with-context {:service (:name svc)}
     (cond
       ;; bail out - nothing to do
@@ -107,14 +107,15 @@
       (errors/raise! ::errors/service-dir-doesnt-exist
                      #(log/errorf "FATAL: service specifies a working directory that doesn't exist: %s" dir))
 
-      ;; we have a dir, it's relative - resolve it
+      ;; we have a dir, it's relative - resolve it against root-dir
       (and (not-empty dir) (not (fs/absolute? dir)))
-      (let [final-path (-> (str config-file-dir "/" dir)
+      (let [final-path (-> (fs/path root-dir dir)
                            fs/absolutize
-                           fs/normalize)]
+                           fs/normalize
+                           str)]
         (log/debugf "Service has a relative working directory; resolved to: %s" final-path)
         (if (fs/exists? final-path)
-          (assoc svc :dir (str final-path))
+          (assoc svc :dir final-path)
           (errors/raise! ::errors/service-dir-doesnt-exist
                          #(log/errorf "FATAL: service specifies a working directory that doesn't exist: %s" final-path)))))))
 
@@ -128,11 +129,14 @@
                 [k v])))
        (into {})))
 
-(defn resolve-env [svc {:keys [config-file-dir]}]
+(defn resolve-env [svc {:keys [root-dir]}]
   (if-let [env-file (:env_file svc)]
     (let [resolved-path (if (fs/absolute? env-file)
                           env-file
-                          (str (fs/absolutize (fs/normalize (str config-file-dir "/" env-file)))))]
+                          (-> (fs/path root-dir env-file)
+                              fs/absolutize
+                              fs/normalize
+                              str))]
       (if (fs/exists? resolved-path)
         (update svc :env merge (parse-env-file resolved-path))
         (errors/raise! ::errors/service-env-file-doesnt-exist
@@ -142,36 +146,59 @@
 
 (defn resolve
   "Figures out other things post-structure validation:
-  - resolves workdirs so that they're absolute path, with the config location being the root in case of relative paths
+  - resolves workdirs so that they're absolute path, using root-dir as base for relative paths
   - ensures that `depends_on` references existing services
   "
-  [conf {:keys [config-file-dir]}]
+  [conf {:keys [root-dir]}]
   (-> conf
       (update :services (fn [services]
                           (->> services
                                (mapv (fn [svc]
                                        (-> svc
-                                           (resolve-service-dir {:config-file-dir config-file-dir})
-                                           (resolve-env {:config-file-dir config-file-dir})
+                                           (resolve-service-dir {:root-dir root-dir})
+                                           (resolve-env {:root-dir root-dir})
                                            (update :tags set)))))))))
 
 ;; FIXME: why do we need to do this?
 (def ordered-map-class
   (class (yaml/parse-string "foo: bar")))
 
-(defn load! [conf-path]
-  (when (str/blank? conf-path)
-    (errors/raise! ::errors/config-not-found))
-  (let [conf-path (str (fs/expand-home conf-path))
-        _ (when-not (fs/exists? conf-path)
-            (errors/raise! ::errors/config-not-found))
-        config-file-dir (str (fs/normalize (fs/absolutize (fs/parent conf-path))))
-        conf-data (->> (yaml/parse-string (slurp conf-path))
-                       ;; convert ordered-map to regular maps, they're easier to work with
-                       (walk/postwalk (fn [thing]
-                                        (if (instance? ordered-map-class thing)
-                                          (into {} thing)
-                                          thing))))]
-    (-> conf-data
-        verify!
-        (resolve {:config-file-dir config-file-dir}))))
+(defn- normalize-path
+  "Expand home dir and normalize path to absolute string."
+  [path]
+  (some-> path
+          fs/expand-home
+          fs/absolutize
+          fs/normalize
+          str))
+
+(defn load!
+  "Load and validate config from path.
+   Options:
+     :root-dir - override root directory for resolving relative paths
+
+   Priority for root directory:
+     1. :root-dir option (CLI --root flag)
+     2. settings.root_dir from config file
+     3. config file's parent directory (default)"
+  ([conf-path] (load! conf-path {}))
+  ([conf-path {:keys [root-dir]}]
+   (when (str/blank? conf-path)
+     (errors/raise! ::errors/config-not-found))
+   (let [conf-path (str (fs/expand-home conf-path))
+         _ (when-not (fs/exists? conf-path)
+             (errors/raise! ::errors/config-not-found))
+         config-file-dir (normalize-path (fs/parent conf-path))
+         conf-data (->> (yaml/parse-string (slurp conf-path))
+                        ;; convert ordered-map to regular maps, they're easier to work with
+                        (walk/postwalk (fn [thing]
+                                         (if (instance? ordered-map-class thing)
+                                           (into {} thing)
+                                           thing))))
+         ;; Priority: CLI --root > settings.root_dir > config-file-dir
+         effective-root (or (normalize-path root-dir)
+                            (normalize-path (get-in conf-data [:settings :root_dir]))
+                            config-file-dir)]
+     (-> conf-data
+         verify!
+         (resolve {:root-dir effective-root})))))
