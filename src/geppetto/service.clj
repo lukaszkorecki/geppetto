@@ -63,9 +63,10 @@
             {:keys [out err] :as process} (proc/process command {:extra-env env
                                                                  :dir dir})
 
-            stdout-thread (Thread.
+            stdout-thread (Thread/startVirtualThread
+                           ^Runnable
                            (fn []
-                             (with-open [rdr (io/reader out)]
+                             (with-open [^BufferedReader rdr (io/reader out)]
                                (loop []
                                  (when-let [line (BufferedReader/.readLine rdr)]
                                    (let [formatted (logger/format-line line {:parse-json? parse_json_logs})]
@@ -74,18 +75,16 @@
                                        (log/info formatted)))
                                    (recur))))))
 
-            stderr-thread (Thread.
+            stderr-thread (Thread/startVirtualThread
+                           ^Runnable
                            (fn []
-                             (with-open [rdr (io/reader err)]
+                             (with-open [^BufferedReader rdr (io/reader err)]
                                (loop []
                                  (when-let [line (BufferedReader/.readLine rdr)]
                                    (let [formatted (logger/format-line line {:parse-json? parse_json_logs})]
                                      (log/with-context {:service (or loggable-name name) :dev "stderr"}
                                        (log/error formatted)))
                                    (recur))))))]
-
-        (Thread/.start stdout-thread)
-        (Thread/.start stderr-thread)
 
         (assoc this
                :process process
