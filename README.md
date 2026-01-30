@@ -88,6 +88,7 @@ Create a YAML file defining your services:
 ```yaml
 settings:
   root_dir: ~/projects  # Optional: base directory for relative paths (default: config file location)
+  exit_mode: on-failure # Optional: all, any, or on-failure (default: all, CLI --exit-mode takes precedence)
 
 services:
   - name: database

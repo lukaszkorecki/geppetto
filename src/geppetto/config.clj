@@ -3,6 +3,7 @@
   (:require
    [mokujin.log :as log]
    [geppetto.errors :as errors]
+   [geppetto.watchdog :as watchdog]
    [babashka.fs :as fs]
    [clj-yaml.core :as yaml]
    [clojure.string :as str]
@@ -70,7 +71,11 @@
       {:description "Default working directory for services with relative paths. When not specified, the config file location is used"
        :optional true
        :min 1}
-      :string]]]
+      :string]
+     [:exit_mode
+      {:description "Exit behavior: all (wait for all), any (exit when any completes), on-failure (exit on first failure)"
+       :optional true}
+      (into [:enum] (map name (keys watchdog/valid-modes)))]]]
 
    [:services
     [:every #'Service]]])

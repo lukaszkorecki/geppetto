@@ -27,13 +27,11 @@
 
 (def cli-options
   [["-e" "--exit-mode EXIT_MODE"
-    (str "Exit behavior when services complete or fail:\n"
+    (str "Exit behavior when services complete or fail (default: " (name default-mode) "):\n"
          (str/join "\n" (map (fn [[mode desc]]
                                (str "                                 - " (name mode) ": " desc))
                              (sort-by (comp name first) watchdog/valid-modes))))
     :id :exit-mode
-    :default default-mode
-    :default-desc (name default-mode)
     :parse-fn #(keyword (namespace default-mode) %)
     :validate [(set (keys watchdog/valid-modes))
                (str "Must be one of: " (str/join ", " (map name (keys watchdog/valid-modes))))]]
@@ -182,16 +180,22 @@
                                        ;; assume config-file path is relative to cwd
                                        (str "./" config-file))
                     {:keys [print-services tags exit-mode services-to-launch root-dir]} options
-                    {:keys [services]} (config/load! config-file-path {:root-dir root-dir})
+                    {:keys [services settings]} (config/load! config-file-path {:root-dir root-dir})
 
                     _ (when (empty? services)
                         (errors/raise! ::errors/no-services-in-config))
+
+                    ;; Priority: CLI > config > default
+                    effective-exit-mode (or exit-mode
+                                            (some->> (:exit_mode settings)
+                                                     (keyword (namespace default-mode)))
+                                            default-mode)
 
                     context {:services services
                              :config-file config-file-path
                              :services-to-launch services-to-launch
                              :tags tags
-                             :exit-mode exit-mode}
+                             :exit-mode effective-exit-mode}
 
                     system (system/build context)]
 
