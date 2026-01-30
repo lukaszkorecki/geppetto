@@ -18,6 +18,7 @@ Think of it as a simple process orchestrator for development environments, integ
 - **Dependency Management**: Services can depend on other services; dependent services only start after their dependencies are running
 - **Color-Coded Output**: Each service gets a unique color for easy visual identification
 - **Environment Variables**: Set custom environment variables per service or load from files
+- **Environment Variable Interpolation**: Use `${VAR}` and `${VAR:-default}` syntax in config values
 - **Tag-Based Filtering**: Run only services with specific tags
 - **Process Lifecycle Management**: Proper cleanup and signal handling
 - **Native Binary**: Compiles to a native executable using GraalVM for fast startup and zero-dependency installations
@@ -152,6 +153,26 @@ Geppetto automatically sets the following environment variables for each service
 
 - **`geppetto.service-name`**: The name of the current service
 
+### Environment Variable Interpolation
+
+Config values can reference environment variables using shell-like syntax:
+
+```yaml
+services:
+  - name: backend
+    command: ./start.sh
+    dir: ${PROJECT_ROOT}/backend
+    env:
+      DATABASE_URL: postgresql://${DB_HOST:-localhost}:5432/mydb
+      API_KEY: ${API_KEY}
+```
+
+Supported syntax:
+- `${VAR}` - replaced with the value of `VAR`, or empty string if not set (with a warning)
+- `${VAR:-default}` - replaced with the value of `VAR`, or `default` if not set
+
+This works in all string values including `command`, `dir`, `env_file`, and `env` values.
+
 ## How It Works
 
 Geppetto uses [Stuart Sierra's Component library](https://github.com/stuartsierra/component) to manage the service lifecycle and dependency graph. Each service is a component that:
@@ -170,7 +191,6 @@ Currently builds native binaries for **macOS ARM64**. Linux support is planned.
 ## Roadmap
 
 - [ ] Linux native binary builds
-- [ ] Environment variable interpolation
 - [ ] Load environment from command output (`env_command`)
 - [ ] Per-service log files with rotation
 - [ ] Service restart policies

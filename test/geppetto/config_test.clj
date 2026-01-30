@@ -68,6 +68,44 @@
       (let [svc {:name "svc-1" :command "command-1" :env_file "non-existent.env"}]
         (is (thrown? clojure.lang.ExceptionInfo (config/resolve-env svc {:root-dir config-file-dir})))))))
 
+(deftest expand-env-vars-test
+  (testing "expands ${VAR} when env var exists"
+    (let [original-home (System/getenv "HOME")]
+      (is (= (str "path: " original-home)
+             (#'config/expand-env-vars "path: ${HOME}")))))
+
+  (testing "expands ${VAR:-default} to value when env var exists"
+    (let [original-home (System/getenv "HOME")]
+      (is (= original-home
+             (#'config/expand-env-vars "${HOME:-/fallback}")))))
+
+  (testing "expands ${VAR:-default} to default when env var missing"
+    (is (= "fallback-value"
+           (#'config/expand-env-vars "${GEPPETTO_TEST_NONEXISTENT_VAR:-fallback-value}"))))
+
+  (testing "expands missing var without default to empty string"
+    (is (= ""
+           (#'config/expand-env-vars "${GEPPETTO_TEST_NONEXISTENT_VAR}"))))
+
+  (testing "expands multiple vars in same string"
+    (let [home (System/getenv "HOME")
+          user (System/getenv "USER")]
+      (is (= (str home "/" user)
+             (#'config/expand-env-vars "${HOME}/${USER}")))))
+
+  (testing "leaves strings without vars unchanged"
+    (is (= "plain string"
+           (#'config/expand-env-vars "plain string")))))
+
+(deftest verify-env-types-test
+  (testing "env map accepts strings, ints, and booleans"
+    (let [config {:services [{:name "svc-1"
+                              :command "echo test"
+                              :env {:STRING_VAR "hello"
+                                    :INT_VAR 42
+                                    :BOOL_VAR true}}]}]
+      (is (= config (config/verify! config))))))
+
 (deftest load-test
   (testing "with a valid config"
     (let [config (config/load! "test/fixtures/valid_config.yaml")]

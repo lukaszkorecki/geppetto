@@ -39,10 +39,9 @@
     [:every :string]]
 
    [:env
-    {:description "Environment variables for the service (as key-value string map)"
+    {:description "Environment variables for the service (values are stringified)"
      :optional true}
-    ;; FIXME: we need to also account for numbers
-    [:map-of :keyword :string]]
+    [:map-of :keyword [:or :string :int :boolean]]]
 
    [:env_command
     {:description "Shell command to run that provides env vars for the service - usually this would be your secret manager of choice"
@@ -82,6 +81,7 @@
                                              (log/with-context {:service "config-parser"}
                                                (log/error "invalid config!"))
                                              (-> (m/explain ServiceConfig conf)
+                                                 me/with-spell-checking
                                                  me/humanize
                                                  (yaml/generate-string)
                                                  println))))
@@ -163,6 +163,36 @@
 (def ordered-map-class
   (class (yaml/parse-string "foo: bar")))
 
+;; Environment variable expansion
+(def ^:private env-var-pattern
+  "Matches ${VAR} or ${VAR:-default}"
+  #"\$\{([^}:]+)(?::-([^}]*))?\}")
+
+(defn- expand-env-var
+  "Expand a single env var match. Returns replacement string."
+  [[_ var-name default-value]]
+  (if-let [value (System/getenv var-name)]
+    value
+    (do
+      (when-not default-value
+        (log/warnf "Environment variable '%s' is not set" var-name))
+      (or default-value ""))))
+
+(defn- expand-env-vars
+  "Expand all ${VAR} and ${VAR:-default} patterns in a string."
+  [s]
+  (str/replace s env-var-pattern expand-env-var))
+
+(defn- expand-env-in-config
+  "Walk config and expand environment variables in all string values."
+  [conf]
+  (walk/postwalk
+   (fn [x]
+     (if (string? x)
+       (expand-env-vars x)
+       x))
+   conf))
+
 (defn- normalize-path
   "Expand home dir and normalize path to absolute string."
   [path]
@@ -194,7 +224,9 @@
                         (walk/postwalk (fn [thing]
                                          (if (instance? ordered-map-class thing)
                                            (into {} thing)
-                                           thing))))
+                                           thing)))
+                        ;; expand ${VAR} and ${VAR:-default} patterns
+                        expand-env-in-config)
          ;; Priority: CLI --root > settings.root_dir > config-file-dir
          effective-root (or (normalize-path root-dir)
                             (normalize-path (get-in conf-data [:settings :root_dir]))
