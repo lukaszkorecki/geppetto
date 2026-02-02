@@ -1,0 +1,27 @@
+name: Main
+
+on:
+  push
+
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    container:
+      image: clojure:tools-deps-bullseye-slim
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Cache Clojure deps
+        uses: actions/cache@v5
+        with:
+          path: /root/.m2/
+          key: v1-deps-${{ hashFiles('deps.edn') }}
+          restore-keys: |
+            v1-deps-${{ hashFiles('deps.edn') }}
+
+      - name: Run tests
+        run: |
+          clojure -M:test
