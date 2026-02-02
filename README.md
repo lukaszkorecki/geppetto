@@ -191,7 +191,7 @@ Currently builds native binaries for **macOS ARM64**. Linux support is planned.
 
 - [ ] Linux native binary builds
 - [ ] Load environment from command output (`env_command`)
-- [ ] Per-service log files with rotation
+- [ ] Load environment variables from file (like Docker's `--env-file`)
 - [ ] Service restart policies
 - [ ] Health checks
 - [ ] Better error handling and reporting

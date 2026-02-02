@@ -56,7 +56,7 @@
   (start [this]
     (if (:process this)
       this
-      (let [env (merge env {"geppetto.service-name" name})
+      (let [env (-> env (merge  {"geppetto.service-name" name}) (update-vals str))
             _ (log/with-context {:service (or loggable-name name)}
                 (if dir
                   (log/infof "starting '%s' in %s" command dir)
