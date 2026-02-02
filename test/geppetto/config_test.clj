@@ -40,34 +40,6 @@
       (let [svc {:name "svc-1" :command "command-1" :dir "non-existent-subdir"}]
         (is (thrown? clojure.lang.ExceptionInfo (#'config/resolve-service-dir svc {:root-dir config-file-dir})))))))
 
-(deftest parse-env-file-test
-  (testing "parses a .env file correctly"
-    (let [expected-env {"VAR1" "value1"
-                        "VAR2" "\"value2\""
-                        "VAR3" "value3"}]
-      (is (= expected-env (#'config/parse-env-file "test/fixtures/test.env"))))))
-
-(deftest resolve-env-test
-  (let [temp-dir (fs/create-temp-dir {:prefix "geppetto-test"})
-        config-file-dir (str temp-dir)]
-    (fs/copy "test/fixtures/test.env" (str temp-dir "/test.env"))
-
-    (testing "when env_file exists"
-      (let [svc {:name "svc-1"
-                 :command "command-1"
-                 :env_file "test.env"
-                 :env {:EXISTING_VAR "some-value"}}
-            resolved-svc (config/resolve-env svc {:root-dir config-file-dir})
-            expected-env {:EXISTING_VAR "some-value"
-                          "VAR1" "value1"
-                          "VAR2" "\"value2\""
-                          "VAR3" "value3"}]
-        (is (= expected-env (:env resolved-svc)))))
-
-    (testing "when env_file does not exist"
-      (let [svc {:name "svc-1" :command "command-1" :env_file "non-existent.env"}]
-        (is (thrown? clojure.lang.ExceptionInfo (config/resolve-env svc {:root-dir config-file-dir})))))))
-
 (deftest expand-env-vars-test
   (testing "expands ${VAR} when env var exists"
     (let [original-home (System/getenv "HOME")]

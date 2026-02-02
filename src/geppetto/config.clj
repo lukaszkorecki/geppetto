@@ -49,11 +49,6 @@
      :optional true}
     :string]
 
-   [:env_file
-    {:description "Path to a file to load environment variables from for the service. Can be absolute or relative  to :dir if specified, otherwise  relative to config root"
-     :optional true}
-    :string]
-
    [:parse_json_logs
     {:description "Parse JSON log lines and output as readable YAML"
      :optional true}
@@ -124,36 +119,8 @@
           (errors/raise! ::errors/service-dir-doesnt-exist
                          #(log/errorf "FATAL: service specifies a working directory that doesn't exist: %s" final-path)))))))
 
-(defn parse-env-file [env-file-path]
-  (->> (slurp env-file-path)
-       str/split-lines
-       (map str/trim)
-       (remove #(or (str/blank? %) (str/starts-with? % "#")))
-       (map (fn [line]
-              (let [[k v] (str/split (str/replace line #"export\s+" "") #"=" 2)]
-                [k v])))
-       (into {})))
-
-(defn resolve-env [svc {:keys [root-dir]}]
-  (if-let [env-file (:env_file svc)]
-    (let [resolved-path (if (fs/absolute? env-file)
-                          env-file
-                          (-> (fs/path root-dir env-file)
-                              fs/absolutize
-                              fs/normalize
-                              str))]
-      (if (fs/exists? resolved-path)
-        (update svc :env merge (parse-env-file resolved-path))
-        (errors/raise! ::errors/service-env-file-doesnt-exist
-                       #(log/errorf "FATAL: service '%s' has an env_file that doesn't exist: %s"
-                                    (:name svc) resolved-path))))
-    svc))
-
 (defn resolve
-  "Figures out other things post-structure validation:
-  - resolves workdirs so that they're absolute path, using root-dir as base for relative paths
-  - ensures that `depends_on` references existing services
-  "
+  "Resolve relative paths in config based on root-dir. In the future this is where we can add env-file support"
   [conf {:keys [root-dir]}]
   (-> conf
       (update :services (fn [services]
@@ -161,7 +128,6 @@
                                (mapv (fn [svc]
                                        (-> svc
                                            (resolve-service-dir {:root-dir root-dir})
-                                           (resolve-env {:root-dir root-dir})
                                            (update :tags set)))))))))
 
 ;; FIXME: why do we need to do this?

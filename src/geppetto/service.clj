@@ -21,10 +21,11 @@
                      tags
                      env
                      dir
-                     ;; TODO
+                     parse_json_logs
+
+                     ;; TODO (?)
                      env_command
                      env_file
-                     parse_json_logs
 
                      ;; internal state:
                      process

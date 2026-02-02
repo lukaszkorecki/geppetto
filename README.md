@@ -103,7 +103,6 @@ services:
       - database
     env:
       DATABASE_URL: postgresql://localhost:5432/mydb
-    env_file: .env.local
 
   - name: nginx
     command: nginx ./dev.conf
@@ -131,13 +130,12 @@ Each service supports the following properties:
 | `dir` | No | Working directory for the command |
 | `depends_on` | No | List of service names this service depends on |
 | `env` | No | Map of environment variables |
-| `env_file` | No | Path to a file to load environment variables from |
 | `tags` | No | List of tags for filtering |
 | `parse_json_logs` | No | Parse JSON log lines and output as readable YAML |
 
 ### Root Directory Resolution
 
-Relative paths in service `dir` and `env_file` are resolved against a root directory. The resolution priority is:
+Relative paths in service `dir` are resolved against a root directory. The resolution priority is:
 
 1. `--root` CLI flag (highest priority)
 2. `settings.root_dir` in config file
@@ -172,7 +170,7 @@ Supported syntax:
 - `${VAR}` - replaced with the value of `VAR`, or empty string if not set (with a warning)
 - `${VAR:-default}` - replaced with the value of `VAR`, or `default` if not set
 
-This works in all string values including `command`, `dir`, `env_file`, and `env` values.
+This works in all string values including `command`, `dir`, and `env` values.
 
 ## How It Works
 
