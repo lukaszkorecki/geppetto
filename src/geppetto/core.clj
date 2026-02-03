@@ -132,11 +132,8 @@
         (log/infof "Starting with config %s - %s services\n" (:config-file context) service-count))
 
       ;; Start the system
-      (let [started-system (component/start-system system)
-            ;; Extract the watchdog and wait for it to signal exit
-            wd (:watchdog started-system)
-            {:keys [exit reason] :as _exit-info} (watchdog/wait-for-exit wd)]
-
+      (let [{:keys [watchdog] :as started-system} (component/start-system system)
+            {:keys [exit reason] :as _exit-info} (watchdog/wait-for-exit watchdog)]
         (log/with-context {:service "geppetto"}
           (log/infof "Shutdown requested: %s" reason))
 
