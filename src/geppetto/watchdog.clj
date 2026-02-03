@@ -1,13 +1,13 @@
 (ns geppetto.watchdog
   (:require
-   [geppetto.task :as task]
+   [geppetto.service :as service]
    [com.stuartsierra.component :as component]
    [mokujin.log :as log]))
 
 (def valid-modes
-  {::on-failure "exit immediately when ANY task fails (non-zero exit)"
-   ::any "exit when ANY task completes (successful or failed)"
-   ::all "wait for ALL tasks to complete"})
+  {::on-failure "exit immediately when ANY service fails (non-zero exit)"
+   ::any "exit when ANY service completes (successful or failed)"
+   ::all "wait for ALL services to complete"})
 
 (def recently-exited (atom []))
 
@@ -15,48 +15,48 @@
   (wait-for-exit [this] "Blocks until watchdog signals exit. Returns exit info map with :exit and :reason."))
 
 (defn- should-exit?
-  "Determines if geppetto should exit based on exit-mode and current task states.
+  "Determines if geppetto should exit based on exit-mode and current service states.
   Returns {:exit exit-code :reason reason-str} if should exit, nil otherwise."
-  [exit-mode tasks]
-  (log/with-context {:task "watchdog"}
-    (let [running (filter task/alive? (vals tasks))
-          exited (filter (comp not task/alive?) (vals tasks))
-          failed (filter (fn [t] (and (not (task/alive? t))
-                                      (not (zero? (task/exit-code t)))))
+  [exit-mode services]
+  (log/with-context {:service "watchdog"}
+    (let [running (filter service/alive? (vals services))
+          exited (filter (comp not service/alive?) (vals services))
+          failed (filter (fn [t] (and (not (service/alive? t))
+                                      (not (zero? (service/exit-code t)))))
                          exited)]
 
       (log/debugf "Watchdog checking exit conditions: running=%d exited=%d failed=%d"
                   (count running) (count exited) (count failed))
 
-      ;; print out newly exited tasks, but only once
+      ;; print out newly exited services, but only once
       (->> (seq exited)
-           (remove (fn [exited-task]
-                     (some #(= (:name exited-task) (:name %)) @recently-exited)))
-           (mapv (fn [exited-task]
-                   (let [exit-code (task/exit-code exited-task)]
-                     (log/with-context {:task (:name exited-task)}
-                       (log/warnf "Task has exited with code %s" exit-code))
-                     (swap! recently-exited conj {:name (:name exited-task)
+           (remove (fn [exited-svc]
+                     (some #(= (:name exited-svc) (:name %)) @recently-exited)))
+           (mapv (fn [exited-svc]
+                   (let [exit-code (service/exit-code exited-svc)]
+                     (log/with-context {:service (:name exited-svc)}
+                       (log/warnf "Service has exited with code %s" exit-code))
+                     (swap! recently-exited conj {:name (:name exited-svc)
                                                   :exit-code exit-code})))))
 
       (cond
         (and (= exit-mode ::on-failure) (seq failed))
         (do
-          (log/debug "on-failure mode: exiting due to failed tasks" {:event "EXITING"})
+          (log/debug "on-failure mode: exiting due to failed services" {:event "EXITING"})
           {:exit 1
-           :reason (str "Tasks failed: " (->> failed (map :name) sort vec))})
+           :reason (str "Services failed: " (->> failed (map :name) sort vec))})
 
         (and (= exit-mode ::any) (seq exited))
         (do
-          (log/debug "any mode: exiting due to task completion" {:event "EXITING"})
+          (log/debug "any mode: exiting due to service completion" {:event "EXITING"})
           {:exit (if (seq failed) 1 0)
-           :reason (str "Task completed: " (->> exited first :name))})
+           :reason (str "Service completed: " (->> exited first :name))})
 
         (empty? running)
         (do
-          (log/debug "all mode: all tasks completed" {:event "EXITING"})
+          (log/debug "all mode: all services completed" {:event "EXITING"})
           {:exit (if (seq failed) 1 0)
-           :reason "All tasks completed"})
+           :reason "All services completed"})
 
         :else
         nil))))
@@ -75,22 +75,22 @@
       (let [store (atom {})
             running? (atom true)
             shutdown-promise (promise)
-            tasks (dissoc this :exit-mode :store :watcher-thread :running? :shutdown-promise)
-            task-count (count tasks)
+            services (dissoc this :exit-mode :store :watcher-thread :running? :shutdown-promise)
+            service-count (count services)
             watcher (future
                       (loop []
                         (Thread/sleep 500)
                         (when @running?
-                          (when-let [exit-info (should-exit? exit-mode tasks)]
-                            (log/with-context {:task "watchdog"}
+                          (when-let [exit-info (should-exit? exit-mode services)]
+                            (log/with-context {:service "watchdog"}
                               (log/warn "Exiting")
                               (log/warnf "Reason: %s code=%s" (:reason exit-info) (:exit exit-info)))
                             (deliver shutdown-promise exit-info))
                           (recur))))]
 
         #_{:clj-kondo/ignore [:mokujin.log/log-message-not-string]}
-        (log/info (format "started %s tasks exit-mode=%s" task-count (name exit-mode))
-                  {:task "watchdog" :event "START"})
+        (log/info (format "started %s services exit-mode=%s" service-count (name exit-mode))
+                  {:service "watchdog" :event "START"})
         (assoc this :store store :watcher-thread watcher :running? running? :shutdown-promise shutdown-promise))))
 
   (stop [this]
@@ -98,7 +98,7 @@
       (reset! running? false)
       (when-let [w (:watcher-thread this)]
         (future-cancel w))
-      (log/info "stopped" {:task "watchdog" :event "STOP"}))
+      (log/info "stopped" {:service "watchdog" :event "STOP"}))
     (assoc this :store nil :watcher-thread nil :running? nil))
 
   IWatchdog

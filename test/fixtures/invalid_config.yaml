@@ -1,2 +1,2 @@
-tasks:
-  - name: task-1
+services:
+  - name: svc-1

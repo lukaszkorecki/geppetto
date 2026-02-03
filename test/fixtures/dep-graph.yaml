@@ -1,4 +1,4 @@
-tasks:
+services:
   - name: foobar
     command: sh -c 'while true ; do echo foobar && sleep 1 ; done'
     tags:
