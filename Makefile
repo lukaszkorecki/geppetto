@@ -17,11 +17,14 @@ build-linux-amd64: # build linux amd64 binary in Docker
 build-linux-arm64: # build linux arm64 binary in Docker
 	echo 'no-op'
 
-release: build-macos-arm64 # create a GitHub release
+release: build-macos-arm64 # create a GitHub release and update Homebrew formula
 	./release.sh
+
+formula-check: # validate formula syntax
+	ruby -c ./HomebrewFormula/geppetto.rb
 
 help:
 	@awk '/^[a-z_\-]+:/ { print $$1 }' ./Makefile | sort
 
 
-.PHONY: fmt test build-bin build-macos-arm64 build-linux-amd64 build-linux-arm64 release help
+.PHONY: fmt test build-bin build-macos-arm64 build-linux-amd64 build-linux-arm64 release formula-check help
