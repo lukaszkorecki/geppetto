@@ -56,10 +56,7 @@
     :id :print-services]
 
    ["-r" "--root ROOT" "Root directory for resolving relative service paths (default: config file directory)"
-    :id :root-dir]
-
-   [nil "--debug" "Enable debug logging. Can be also enabled by setting DEBUG env var to non-empty value."
-    :id :debug]])
+    :id :root-dir]])
 
 (defmulti cli-dispatch (fn [{:keys [action] :as _args}] action))
 

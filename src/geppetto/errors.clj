@@ -7,6 +7,7 @@
 (def registry
   {::unknown {:message "An unknown error occurred."}
    ;; fatal errors
+   ::blank-config-path {:message "Configuration file path is blank." :exit-code 1}
    ::config-not-found {:message "Configuration file not found." :exit-code 1}
    ::invalid-config {:message "Configuration file is invalid." :exit-code 2}
    ::service-dir-doesnt-exist {:message "Service working directory does not exist." :exit-code 3}

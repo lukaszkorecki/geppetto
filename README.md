@@ -78,7 +78,6 @@ geppetto [options] <config-file.yaml>
 -p, --print-services   Print the list of services defined in config and exit
 -v, --version          Show version
 -h, --help             Show help
-    --debug            Enable debug logging (also via DEBUG env var)
 ```
 
 ### Configuration Format

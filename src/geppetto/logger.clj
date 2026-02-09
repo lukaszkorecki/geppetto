@@ -8,7 +8,7 @@
 
 (set! *warn-on-reflection* true)
 
-(defn config [debug?]
+(defn config [debug?] ;; XXX: does this actually work in native-image? since it's only used at compile time?
   (lbc/data->xml-str
    [:configuration
     [:appender {:name "STDOUT", :class "ch.qos.logback.core.ConsoleAppender"}

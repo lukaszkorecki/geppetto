@@ -185,7 +185,7 @@
   ([conf-path] (load! conf-path {}))
   ([conf-path {:keys [root-dir]}]
    (when (str/blank? conf-path)
-     (errors/raise! ::errors/config-not-found))
+     (errors/raise! ::errors/blank-config-path))
    (let [conf-path (str (fs/expand-home conf-path))
          _ (when-not (fs/exists? conf-path)
              (errors/raise! ::errors/config-not-found))
