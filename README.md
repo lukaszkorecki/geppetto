@@ -1,3 +1,8 @@
+> [!NOTE]
+> Archived, check out [Pitchfork](https://pitchfork.en.dev/) - if I knew it existed
+> I wouldn't start working on Geppetto
+
+
 # Geppetto
 
 > [!WARNING]
